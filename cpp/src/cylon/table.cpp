@@ -142,7 +142,8 @@ cylon::Status Shuffle(cylon::CylonContext *ctx,
   all_to_all.finish();
   while (!all_to_all.isComplete()) {}
   all_to_all.close();
-
+  // after this lets try to reset the table
+  table.reset();
   // now clear locally partitioned tables
   partitioned_tables.clear();
 
