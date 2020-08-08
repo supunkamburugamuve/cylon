@@ -106,6 +106,8 @@ cylon::Status Shuffle(cylon::CylonContext *ctx,
   std::unordered_map<int, std::shared_ptr<cylon::Table>> partitioned_tables{};
   // partition the tables locally
   table->HashPartition(hash_columns, ctx->GetWorldSize(), &partitioned_tables);
+  // after this lets try to reset the table
+  table.reset();
   auto neighbours = ctx->GetNeighbours(true);
   vector<std::shared_ptr<arrow::Table>> received_tables;
   // define call back to catch the receiving tables
@@ -142,8 +144,6 @@ cylon::Status Shuffle(cylon::CylonContext *ctx,
   all_to_all.finish();
   while (!all_to_all.isComplete()) {}
   all_to_all.close();
-  // after this lets try to reset the table
-  table.reset();
   // now clear locally partitioned tables
   partitioned_tables.clear();
 
