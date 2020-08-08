@@ -76,7 +76,7 @@ class Table {
    * @return
    */
   static Status FromArrowTable(cylon::CylonContext *ctx,
-                               const std::shared_ptr<arrow::Table> &table,
+                               std::shared_ptr<arrow::Table> table,
                                std::shared_ptr<Table> *tableOut);
 
   /**
