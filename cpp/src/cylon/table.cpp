@@ -414,6 +414,7 @@ Status Table::DistributedJoin(std::shared_ptr<cylon::Table> &left,
 
   std::shared_ptr<arrow::Table> left_final_table;
   std::shared_ptr<arrow::Table> right_final_table;
+  CylonContext *ctx = left->ctx;
   auto shuffle_status = ShuffleTwoTables(left->ctx,
                                          left,
                                          left_hash_columns,
@@ -429,8 +430,8 @@ Status Table::DistributedJoin(std::shared_ptr<cylon::Table> &left,
         right_final_table,
         join_config,
         &table,
-        cylon::ToArrowPool(left->ctx));
-    *out = std::make_shared<cylon::Table>(table, left->ctx);
+        cylon::ToArrowPool(ctx));
+    *out = std::make_shared<cylon::Table>(table, ctx);
     return Status(static_cast<int>(status.code()), status.message());
   } else {
     return shuffle_status;
