@@ -65,7 +65,7 @@ arrow::Status do_sorted_join(const std::shared_ptr<arrow::Table> &left_tab,
   std::shared_ptr<arrow::Table> left_tab_comb, right_tab_comb;
   arrow::Status lstatus, rstatus;
   auto t11 = std::chrono::high_resolution_clock::now();
-
+  LOG(INFO) << "2";
   lstatus = cylon::join::util::CombineChunks(left_tab, left_join_column_idx,
       left_tab_comb, memory_pool);
   rstatus = cylon::join::util::CombineChunks(right_tab, right_join_column_idx,
@@ -414,6 +414,7 @@ arrow::Status joinTables(const std::shared_ptr<arrow::Table> &left_tab,
                          cylon::join::config::JoinConfig join_config,
                          std::shared_ptr<arrow::Table> *joined_table,
                          arrow::MemoryPool *memory_pool) {
+  LOG(INFO) << "1";
   auto left_type = left_tab->column(join_config.GetLeftColumnIdx())->type()->id();
   auto right_type = right_tab->column(join_config.GetRightColumnIdx())->type()->id();
 
