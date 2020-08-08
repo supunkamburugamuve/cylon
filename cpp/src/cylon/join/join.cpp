@@ -414,7 +414,6 @@ arrow::Status joinTables(const std::shared_ptr<arrow::Table> &left_tab,
                          cylon::join::config::JoinConfig join_config,
                          std::shared_ptr<arrow::Table> *joined_table,
                          arrow::MemoryPool *memory_pool) {
-  LOG(INFO) << "1";
   auto left_type = left_tab->column(join_config.GetLeftColumnIdx())->type()->id();
   auto right_type = right_tab->column(join_config.GetRightColumnIdx())->type()->id();
 

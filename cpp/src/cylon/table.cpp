@@ -107,6 +107,7 @@ cylon::Status Shuffle(cylon::CylonContext *ctx,
   // partition the tables locally
   table->HashPartition(hash_columns, ctx->GetWorldSize(), &partitioned_tables);
   // after this lets try to reset the table
+  shared_ptr<arrow::Schema> ptr = table->get_table()->schema();
   table.reset();
   auto neighbours = ctx->GetNeighbours(true);
   vector<std::shared_ptr<arrow::Table>> received_tables;
@@ -129,8 +130,9 @@ cylon::Status Shuffle(cylon::CylonContext *ctx,
 
   // doing all to all communication to exchange tables
   cylon::ArrowAllToAll all_to_all(ctx, neighbours, neighbours, edge_id,
-                                  std::make_shared<AllToAllListener>(&received_tables, ctx->GetRank()),
-                                  table->get_table()->schema(), cylon::ToArrowPool(ctx));
+                                  std::make_shared<AllToAllListener>(&received_tables,
+                                       ctx->GetRank()),
+                                       ptr, cylon::ToArrowPool(ctx));
 
   for (auto &partitioned_table : partitioned_tables) {
     if (partitioned_table.first != ctx->GetRank()) {
