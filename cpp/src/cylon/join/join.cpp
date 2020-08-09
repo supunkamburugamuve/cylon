@@ -218,7 +218,9 @@ arrow::Status do_sorted_join(const std::shared_ptr<arrow::Table> &left_tab,
   }
 
   t2 = std::chrono::high_resolution_clock::now();
-
+  // clear the sort columns
+  left_index_sorted_column.reset();
+  right_index_sorted_column.reset();
   LOG(INFO) << "Index join time : "
             << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
   LOG(INFO) << "Building final table with number of tuples - " << left_indices->size();
