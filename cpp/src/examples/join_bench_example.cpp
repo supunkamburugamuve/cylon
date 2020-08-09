@@ -116,6 +116,10 @@ int main(int argc, char *argv[]) {
   auto schema = std::make_shared<arrow::Schema>(schema_vector);
   std::shared_ptr<arrow::Table> left_table = arrow::Table::Make(schema, {std::move(left_id_array), cost_array});
   std::shared_ptr<arrow::Table> right_table = arrow::Table::Make(schema, {std::move(right_id_array), std::move(cost_array)});
+  LOG(INFO) << "REEEEEEEE " << left_id_array.use_count();
+  for (auto t : left_table->columns()) {
+    LOG(INFO) << t.use_count();
+  }
 
   std::shared_ptr<cylon::Table> first_table, second_table, joined;
   auto status = cylon::Table::FromArrowTable(ctx, std::move(left_table), &first_table);

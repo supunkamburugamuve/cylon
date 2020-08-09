@@ -108,7 +108,18 @@ cylon::Status Shuffle(cylon::CylonContext *ctx,
   table->HashPartition(hash_columns, ctx->GetWorldSize(), &partitioned_tables);
   // after this lets try to reset the table
   shared_ptr<arrow::Schema> ptr = table->get_table()->schema();
+  shared_ptr<arrow::Table> sharedPtr = table->get_table();
+  LOG(INFO) << "REF COUNT ***************** " << table.use_count() << " " << sharedPtr.use_count();
   table.reset();
+  std::shared_ptr<arrow::ChunkedArray> f = sharedPtr->column(0);
+  for (auto t : sharedPtr->columns()) {
+    LOG(INFO) << t.use_count();
+  }
+  LOG(INFO) << "REF1 )))) " << sharedPtr.use_count() << " " << f.use_count();
+  sharedPtr.reset();
+  LOG(INFO) << "REF2 )))) " << sharedPtr.use_count() << " " << f.use_count();
+  f.reset();
+
   auto neighbours = ctx->GetNeighbours(true);
   vector<std::shared_ptr<arrow::Table>> received_tables;
   // define call back to catch the receiving tables
@@ -178,8 +189,11 @@ Status ShuffleTwoTables(CylonContext *ctx,
                         ctx->GetNextSequence(), left_table_out);
   if (status.is_ok()) {
     LOG(INFO) << "Left table shuffled";
-    return Shuffle(ctx, right_table, right_hash_columns,
+    status = Shuffle(ctx, right_table, right_hash_columns,
                    ctx->GetNextSequence(), right_table_out);
+    if (status.is_ok()) {
+      LOG(INFO) << "Right table shuffled";
+    }
   }
   return status;
 }
