@@ -431,6 +431,7 @@ Status Table::DistributedJoin(std::shared_ptr<cylon::Table> &left,
   std::shared_ptr<arrow::Table> left_final_table;
   std::shared_ptr<arrow::Table> right_final_table;
   CylonContext *ctx = left->ctx;
+  auto t1 = std::chrono::steady_clock::now();
   auto shuffle_status = ShuffleTwoTables(left->ctx,
                                          left,
                                          left_hash_columns,
@@ -438,6 +439,9 @@ Status Table::DistributedJoin(std::shared_ptr<cylon::Table> &left,
                                          right_hash_columns,
                                          &left_final_table,
                                          &right_final_table);
+  auto t2 = std::chrono::steady_clock::now();
+  LOG(INFO) << "**** Shuffle time *********** "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << "ms";
   LOG(INFO) << "shuffle done waiting";
   sleep(20);
   if (shuffle_status.is_ok()) {
