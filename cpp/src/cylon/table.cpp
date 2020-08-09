@@ -438,6 +438,7 @@ Status Table::DistributedJoin(std::shared_ptr<cylon::Table> &left,
                                          right_hash_columns,
                                          &left_final_table,
                                          &right_final_table);
+  LOG(INFO) << "shuffle done waiting";
   sleep(20);
   if (shuffle_status.is_ok()) {
     // now do the local join
