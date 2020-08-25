@@ -31,9 +31,11 @@ void create_int64_table_small(int count,
 
   arrow::Status st = left_id_builder.Reserve(count);
   st = cost_builder.Reserve(count);
+  LOG(INFO) << "Pritning";
   for (uint64_t i = 0; i < count; i++) {
     int64_t l = next_random_num() % range;
     int64_t v = next_random_num() % range;
+    LOG(INFO) << l;
     left_id_builder.UnsafeAppend(l);
     cost_builder.UnsafeAppend(v);
   }
@@ -55,19 +57,39 @@ void create_int64_table_small(int count,
 }
 
 class mycomparison {
-  std::vector<std::shared_ptr<arrow::Array>> *array;
+  std::vector<std::shared_ptr<arrow::Array>> *cols;
+  std::vector<std::shared_ptr<arrow::Array>> *sort_index;
+  int32_t *indexes;
  public:
-  mycomparison(std::vector<std::shared_ptr<arrow::Array>> *a) {
-    array = a;
+  mycomparison(std::vector<std::shared_ptr<arrow::Array>> *a, std::vector<std::shared_ptr<arrow::Array>> *indx, int32_t *ids) {
+    cols = a;
+    indexes = ids;
+    sort_index = indx;
   }
   bool operator()(const int32_t &lhs,
                   const int32_t &rhs) const {
+    int leftIndex = indexes[lhs];
+    int rightIndex = indexes[rhs];
+    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> leftSortIndexArray =
+        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*sort_index)[lhs]);
+    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> rightSortIndexArray =
+        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*sort_index)[rhs]);
 
+    int leftSortIndex = leftSortIndexArray->GetView(leftIndex);
+    int rightSortIndex = rightSortIndexArray->GetView(rightIndex);
+
+    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> leftArray =
+        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*cols)[lhs]);
+    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> rightArray =
+        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*cols)[rhs]);
+    long i = leftArray->GetView(leftSortIndex);
+    long view = rightArray->GetView(rightSortIndex);
+    return i < view;
   }
 };
 
 int main(int argc, char *argv[]) {
-  int count = 10;
+  int count = 4;
   int arrays = 2;
   auto mpi_config = new cylon::net::MPIConfig();
   auto ctx = cylon::CylonContext::InitDistributed(mpi_config);
@@ -98,26 +120,28 @@ int main(int argc, char *argv[]) {
   auto* indexes = new int32_t[arrays];
   std::fill(indexes, indexes + arrays, 0);
 
-  std::priority_queue<int32_t, std::vector<int32_t>, mycomparison> merge_queue(mycomparison());
+  std::priority_queue<int32_t, std::vector<int32_t>, mycomparison> merge_queue((mycomparison(&sort_cols, &sort_indices, indexes)));
   for (int32_t i = 0; i < arrays; i++) {
     auto a = std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_cols[i]);
-    merge_queue.push(std::make_pair(i, a->GetView(indexes[i])));
+    merge_queue.push(i);
     indexes[i] = indexes[i] + 1;
   }
   int32_t prev = 0;
   // now merge
   while (!merge_queue.empty()) {
-    std::pair<int32_t, int64_t> p = merge_queue.top();
+    int32_t p = merge_queue.top();
     merge_queue.pop();
-    int32_t kI = p.first;
-    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> a =
-        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_cols[kI]);
-    int64_t l = a->length();
+    int32_t kI = p;
+    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> array =
+        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_cols[p]);
+    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> sort =
+        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_indices[p]);
+    int64_t l = array->length();
 
-    LOG(INFO) << p.second;
+    LOG(INFO) << array->GetView(sort->GetView(indexes[kI]));
     if (indexes[kI] < l) {
-      merge_queue.push(std::make_pair(kI, a->GetView(indexes[kI])));
       indexes[kI] = indexes[kI] + 1;
+      merge_queue.push(p);
     }
   }
 }
