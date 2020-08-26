@@ -90,8 +90,12 @@ class mycomparison {
 };
 
 int main(int argc, char *argv[]) {
-  int count = 20000000;
-  int arrays = 1;
+  int count = 1000;
+  int arrays = 10;
+  if (argc >= 3) {
+    count = stoull(argv[1]);;
+    arrays = stoull(argv[2]);;
+  }
   auto mpi_config = new cylon::net::MPIConfig();
   auto ctx = cylon::CylonContext::InitDistributed(mpi_config);
   arrow::MemoryPool *pool = arrow::default_memory_pool();
