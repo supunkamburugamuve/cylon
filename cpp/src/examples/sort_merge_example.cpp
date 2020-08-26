@@ -96,6 +96,7 @@ int main(int argc, char *argv[]) {
     count = stoull(argv[1]);;
     arrays = stoull(argv[2]);;
   }
+  LOG(INFO) << "Count " << count << " number of arrays " << arrays;
   auto mpi_config = new cylon::net::MPIConfig();
   auto ctx = cylon::CylonContext::InitDistributed(mpi_config);
   arrow::MemoryPool *pool = arrow::default_memory_pool();
