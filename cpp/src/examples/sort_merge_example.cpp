@@ -31,11 +31,11 @@ void create_int64_table_small(int count,
 
   arrow::Status st = left_id_builder.Reserve(count);
   st = cost_builder.Reserve(count);
-  LOG(INFO) << "Pritning";
+//  LOG(INFO) << "Pritning";
   for (uint64_t i = 0; i < count; i++) {
     int64_t l = next_random_num() % range;
     int64_t v = next_random_num() % range;
-    LOG(INFO) << l;
+//    LOG(INFO) << l;
     left_id_builder.UnsafeAppend(l);
     cost_builder.UnsafeAppend(v);
   }
@@ -70,6 +70,7 @@ class mycomparison {
                   const int32_t &rhs) const {
     int leftIndex = indexes[lhs];
     int rightIndex = indexes[rhs];
+
     std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> leftSortIndexArray =
         std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*sort_index)[lhs]);
     std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> rightSortIndexArray =
@@ -84,13 +85,13 @@ class mycomparison {
         std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*cols)[rhs]);
     long i = leftArray->GetView(leftSortIndex);
     long view = rightArray->GetView(rightSortIndex);
-    return i < view;
+    return i > view;
   }
 };
 
 int main(int argc, char *argv[]) {
-  int count = 4;
-  int arrays = 2;
+  int count = 20000000;
+  int arrays = 1;
   auto mpi_config = new cylon::net::MPIConfig();
   auto ctx = cylon::CylonContext::InitDistributed(mpi_config);
   arrow::MemoryPool *pool = arrow::default_memory_pool();
@@ -110,6 +111,14 @@ int main(int argc, char *argv[]) {
     std::shared_ptr<arrow::Array> a = t->column(0)->chunk(0);
     std::shared_ptr<arrow::Array> index_sorted_column;
     arrow::Status st = cylon::SortIndices(pool, a, &index_sorted_column);
+
+    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> sort =
+        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(index_sorted_column);
+//    LOG(INFO) << "Sorted indexes";
+//    for (int j = 0; j < sort->length(); j++) {
+//      LOG(INFO) << sort->GetView(j);
+//    }
+
     sort_indices.push_back(index_sorted_column);
     sort_cols.push_back(a);
   }
@@ -124,25 +133,31 @@ int main(int argc, char *argv[]) {
   for (int32_t i = 0; i < arrays; i++) {
     auto a = std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_cols[i]);
     merge_queue.push(i);
-    indexes[i] = indexes[i] + 1;
   }
   int32_t prev = 0;
+  auto merge_start_time = std::chrono::steady_clock::now();
   // now merge
-  while (!merge_queue.empty()) {
+  while (merge_queue.size() > 0) {
     int32_t p = merge_queue.top();
     merge_queue.pop();
     int32_t kI = p;
     std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> array =
         std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_cols[p]);
-    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> sort =
-        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_indices[p]);
+//    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> sort =
+//        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_indices[p]);
     int64_t l = array->length();
 
-    LOG(INFO) << array->GetView(sort->GetView(indexes[kI]));
+//    LOG(INFO) << kI << " pos " << indexes[kI] << " sort indx " << sort->GetView(indexes[kI]) << " " << array->GetView(sort->GetView(indexes[kI]));
+    indexes[kI] = indexes[kI] + 1;
     if (indexes[kI] < l) {
-      indexes[kI] = indexes[kI] + 1;
       merge_queue.push(p);
     }
   }
+
+  auto merge_end_time = std::chrono::steady_clock::now();
+  LOG(INFO) << "Merge "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(
+                merge_end_time - merge_start_time).count() << "[ms]";
+  ctx->Finalize();
 }
 
