@@ -58,15 +58,15 @@ void create_int64_table_small(int count,
                                  {std::move(left_id_array), cost_array});
 }
 
-class mycomparison {
+class IndexComparator {
   std::vector<std::shared_ptr<arrow::Array>> *cols;
   std::vector<std::shared_ptr<arrow::Array>> *sort_index;
   std::vector<const int64_t *> raw_vals;
   std::vector<const int64_t *> raw_indx;
   int32_t *indexes;
  public:
-  mycomparison(std::vector<std::shared_ptr<arrow::Array>> *a,
-      std::vector<std::shared_ptr<arrow::Array>> *indx, int32_t *ids) {
+  IndexComparator(std::vector<std::shared_ptr<arrow::Array>> *a,
+                  std::vector<std::shared_ptr<arrow::Array>> *indx, int32_t *ids) {
     cols = a;
     indexes = ids;
     sort_index = indx;
@@ -86,19 +86,10 @@ class mycomparison {
                   const int32_t &rhs) const {
     int leftIndex = indexes[lhs];
     int rightIndex = indexes[rhs];
-
-//    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> leftSortIndexArray =
-//        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*sort_index)[lhs]);
-//    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> rightSortIndexArray =
-//        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*sort_index)[rhs]);
-
     int64_t leftSortIndex = raw_indx[lhs][leftIndex];
     int64_t rightSortIndex = raw_indx[rhs][rightIndex];
+    LOG(INFO) << "AAAAAAA";
 
-//    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> leftArray =
-//        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*cols)[lhs]);
-//    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> rightArray =
-//        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>((*cols)[rhs]);
     long i = raw_vals[lhs][leftSortIndex];
     long view = raw_vals[rhs][rightSortIndex];
     return i > view;
@@ -134,7 +125,7 @@ void sortandmerge(int count,
                   arrow::MemoryPool *pool);
 
 int main(int argc, char *argv[]) {
-  int count = 1000000;
+  int count = 10000000;
   int arrays = 1;
   if (argc >= 3) {
     count = stoull(argv[1]);;
@@ -183,22 +174,24 @@ void sortmerge_vectors(int count, int arrays, cylon::CylonContext *ctx,
   fill(indexes, indexes + arrays, 0);
   std::priority_queue<int32_t, vector<int32_t>, vectorcompare> merge_queue(
       (vectorcompare(&vectors, indexes)));
+
   auto merge_start_time = std::chrono::steady_clock::now();
   for (int32_t i = 0; i < arrays; i++) {
     merge_queue.push(i);
   }
+  int c = 0, n = 0;
   // now merge
   while (!merge_queue.empty()) {
     int32_t p = merge_queue.top();
     merge_queue.pop();
-    std::vector<int64_t> *leftArray = vectors[p];
-    int64_t l = leftArray->size();
-//    LOG(INFO) << (*leftArray)[indexes[p]];
     indexes[p] = indexes[p] + 1;
-    if (indexes[p] < l) {
+    if (indexes[p] < count) {
       merge_queue.push(p);
+      n++;
     }
+    c++;
   }
+  LOG(INFO) << c << " " << n;
 
   auto merge_end_time = std::chrono::steady_clock::now();
   LOG(INFO) << "Merge "
@@ -240,32 +233,26 @@ void sortandmerge(int count,
   auto* indexes = new int32_t[arrays];
   fill(indexes, indexes + arrays, 0);
 
-  std::priority_queue<int32_t, vector<int32_t>, mycomparison> merge_queue(
-      (mycomparison(&sort_cols, &sort_indices, indexes)));
+  std::priority_queue<int32_t, vector<int32_t>, IndexComparator> merge_queue(
+      (IndexComparator(&sort_cols, &sort_indices, indexes)));
+
+  auto merge_start_time = std::chrono::steady_clock::now();
   for (int32_t i = 0; i < arrays; i++) {
-    auto a = static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_cols[i]);
     merge_queue.push(i);
   }
-  auto merge_start_time = std::chrono::steady_clock::now();
+  int c = 0, n = 0;
   // now merge
   while (!merge_queue.empty()) {
     int32_t p = merge_queue.top();
     merge_queue.pop();
-    int32_t kI = p;
-//    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> array =
-//        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_cols[p]);
-//    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> sort =
-//        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_indices[p]);
-//    int64_t l = array->length();
-//    int64_t t = array->GetView(sort->GetView(indexes[kI]));
-
-    // LOG(INFO) << kI << " pos " << indexes[kI] << " sort indx "
-    // << sort->GetView(indexes[kI]) << " " << array->GetView(sort->GetView(indexes[kI]));
-    indexes[kI] = indexes[kI] + 1;
-    if (indexes[kI] < count) {
+    indexes[p] = indexes[p] + 1;
+    if (indexes[p] < count) {
       merge_queue.push(p);
+      n++;
     }
+    c++;
   }
+  LOG(INFO) << c << " " << n;
 
   auto merge_end_time = std::chrono::steady_clock::now();
   LOG(INFO) << "Merge "
