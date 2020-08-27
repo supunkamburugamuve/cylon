@@ -252,17 +252,17 @@ void sortandmerge(int count,
     int32_t p = merge_queue.top();
     merge_queue.pop();
     int32_t kI = p;
-    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> array =
-        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_cols[p]);
-    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> sort =
-        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_indices[p]);
-    int64_t l = array->length();
+//    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> array =
+//        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_cols[p]);
+//    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> sort =
+//        std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_indices[p]);
+//    int64_t l = array->length();
 //    int64_t t = array->GetView(sort->GetView(indexes[kI]));
 
     // LOG(INFO) << kI << " pos " << indexes[kI] << " sort indx "
     // << sort->GetView(indexes[kI]) << " " << array->GetView(sort->GetView(indexes[kI]));
     indexes[kI] = indexes[kI] + 1;
-    if (indexes[kI] < l) {
+    if (indexes[kI] < count) {
       merge_queue.push(p);
     }
   }
