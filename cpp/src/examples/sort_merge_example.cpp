@@ -134,7 +134,7 @@ void sortandmerge(int count,
                   arrow::MemoryPool *pool);
 
 int main(int argc, char *argv[]) {
-  int count = 40000000;
+  int count = 1000000;
   int arrays = 1;
   if (argc >= 3) {
     count = stoull(argv[1]);;
@@ -257,7 +257,7 @@ void sortandmerge(int count,
     std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> sort =
         std::static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(sort_indices[p]);
     int64_t l = array->length();
-    int64_t t = array->GetView(sort->GetView(indexes[kI]));
+//    int64_t t = array->GetView(sort->GetView(indexes[kI]));
 
     // LOG(INFO) << kI << " pos " << indexes[kI] << " sort indx "
     // << sort->GetView(indexes[kI]) << " " << array->GetView(sort->GetView(indexes[kI]));
