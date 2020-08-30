@@ -490,6 +490,8 @@ void join_small2(int count,
   std::vector<int> hash_columns = {0, 0};
   std::shared_ptr<cylon::Table> lt;
   std::shared_ptr<cylon::Table> rt;
+
+  auto start_start = std::chrono::steady_clock::now();
   cylon::Table::FromArrowTable(ctx, large_left, &lt);
   cylon::Table::FromArrowTable(ctx, large_right, &rt);
   std::unordered_map<int, std::shared_ptr<cylon::Table>> left_out;
@@ -505,7 +507,6 @@ void join_small2(int count,
   }
 
   std::vector<std::shared_ptr<arrow::Table>> join_tables;
-  auto start_start = std::chrono::steady_clock::now();
   for (int i = 0; i < arrays; i++) {
     auto leftt = left_tables[i];
     auto rightt = right_tables[i];
