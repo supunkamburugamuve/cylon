@@ -7,11 +7,17 @@
 #include <random>
 #include <queue>
 #include <algorithm>
+#include <ops/kernels/partition.hpp>
 
 void sortmerge_vectors(int count, int arrays, cylon::CylonContext *ctx,
                        arrow::MemoryPool *pool);
 
 void join_small(int count,
+                int arrays,
+                cylon::CylonContext *ctx,
+                arrow::MemoryPool *pool);
+
+void join_small2(int count,
                 int arrays,
                 cylon::CylonContext *ctx,
                 arrow::MemoryPool *pool);
@@ -137,7 +143,7 @@ void sortandmerge2(int count,
 int main(int argc, char *argv[]) {
   srand(time(NULL));
   int count = 500;
-  int arrays = 80000;
+  int arrays = 80;
   if (argc >= 3) {
     count = stoull(argv[1]);;
     arrays = stoull(argv[2]);;
@@ -148,7 +154,7 @@ int main(int argc, char *argv[]) {
   arrow::MemoryPool *pool = arrow::default_memory_pool();
 //  sortandmerge2(count, arrays, ctx, pool);
 //  sortmerge_vectors(count, arrays, ctx, pool);
-  join_small(count, arrays, ctx, pool);
+  join_small2(count, arrays, ctx, pool);
 
   ctx->Finalize();
 }
@@ -461,6 +467,50 @@ void join_small(int count,
     auto rt = right_tables[i];
     shared_ptr<arrow::Table> joined;
     cylon::join::joinTables(lt, rt, cylon::join::config::JoinConfig::InnerJoin(0, 0), &joined);
+    join_tables.push_back(joined);
+  }
+  auto join_end_time = std::chrono::steady_clock::now();
+  LOG(INFO) << "Sort "
+            << chrono::duration_cast<chrono::milliseconds>(
+                join_end_time - start_start).count() << "[ms]";
+}
+
+void join_small2(int count,
+                int arrays,
+                cylon::CylonContext *ctx,
+                arrow::MemoryPool *pool) {
+  std::vector<std::shared_ptr<arrow::Table>> left_tables;
+  std::vector<std::shared_ptr<arrow::Table>> right_tables;
+
+  std::shared_ptr<arrow::Table> large_left;
+  std::shared_ptr<arrow::Table> large_right;
+  int length = arrays * count;
+  create_int64_table_small(length, ctx, pool, large_left);
+  create_int64_table_small(length, ctx, pool, large_right);
+  std::vector<int> hash_columns = {0, 0};
+  std::shared_ptr<cylon::Table> lt;
+  std::shared_ptr<cylon::Table> rt;
+  cylon::Table::FromArrowTable(ctx, large_left, &lt);
+  cylon::Table::FromArrowTable(ctx, large_right, &rt);
+  std::unordered_map<int, std::shared_ptr<cylon::Table>> left_out;
+  std::unordered_map<int, std::shared_ptr<cylon::Table>> right_out;
+  cylon::kernel::HashPartition(ctx, std::shared_ptr<cylon::Table>(lt),
+                               hash_columns, arrays, &left_out);
+  cylon::kernel::HashPartition(ctx, std::shared_ptr<cylon::Table>(lt),
+                               hash_columns, arrays, &right_out);
+
+  for (int i = 0; i < arrays; i++) {
+    left_tables.push_back(left_out[i]->get_table());
+    right_tables.push_back(right_out[i]->get_table());
+  }
+
+  std::vector<std::shared_ptr<arrow::Table>> join_tables;
+  auto start_start = std::chrono::steady_clock::now();
+  for (int i = 0; i < arrays; i++) {
+    auto leftt = left_tables[i];
+    auto rightt = right_tables[i];
+    shared_ptr<arrow::Table> joined;
+    cylon::join::joinTables(leftt, rightt, cylon::join::config::JoinConfig::InnerJoin(0, 0), &joined);
     join_tables.push_back(joined);
   }
   auto join_end_time = std::chrono::steady_clock::now();
