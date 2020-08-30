@@ -11,6 +11,11 @@
 void sortmerge_vectors(int count, int arrays, cylon::CylonContext *ctx,
                        arrow::MemoryPool *pool);
 
+void join_small(int count,
+                int arrays,
+                cylon::CylonContext *ctx,
+                arrow::MemoryPool *pool);
+
 uint64_t next_random_num() {
   uint64_t randnumber = 0;
   for (int i = 19; i >= 1; i--) {
@@ -31,7 +36,6 @@ void create_int64_table_small(int count,
   arrow::Int64Builder cost_builder(pool);
 
   uint64_t range = count * ctx->GetWorldSize();
-  srand(time(NULL) + ctx->GetRank());
 
   arrow::Status st = left_id_builder.Reserve(count);
   st = cost_builder.Reserve(count);
@@ -88,11 +92,13 @@ class IndexComparator {
     int rightIndex = indexes[rhs];
     int64_t leftSortIndex = raw_indx[lhs][leftIndex];
     int64_t rightSortIndex = raw_indx[rhs][rightIndex];
-    LOG(INFO) << "AAAAAAA";
-
     long i = raw_vals[lhs][leftSortIndex];
     long view = raw_vals[rhs][rightSortIndex];
     return i > view;
+  }
+
+  virtual ~IndexComparator() {
+    LOG(INFO) << "DESTRUCT";
   }
 };
 
@@ -123,10 +129,15 @@ void sortandmerge(int count,
                   int arrays,
                   cylon::CylonContext *ctx,
                   arrow::MemoryPool *pool);
+void sortandmerge2(int count,
+                  int arrays,
+                  cylon::CylonContext *ctx,
+                  arrow::MemoryPool *pool);
 
 int main(int argc, char *argv[]) {
-  int count = 10000000;
-  int arrays = 1;
+  srand(time(NULL));
+  int count = 500;
+  int arrays = 80000;
   if (argc >= 3) {
     count = stoull(argv[1]);;
     arrays = stoull(argv[2]);;
@@ -135,8 +146,9 @@ int main(int argc, char *argv[]) {
   auto mpi_config = new cylon::net::MPIConfig();
   auto ctx = cylon::CylonContext::InitDistributed(mpi_config);
   arrow::MemoryPool *pool = arrow::default_memory_pool();
-  sortandmerge(count, arrays, ctx, pool);
-  sortmerge_vectors(count, arrays, ctx, pool);
+//  sortandmerge2(count, arrays, ctx, pool);
+//  sortmerge_vectors(count, arrays, ctx, pool);
+  join_small(count, arrays, ctx, pool);
 
   ctx->Finalize();
 }
@@ -258,5 +270,202 @@ void sortandmerge(int count,
   LOG(INFO) << "Merge "
             << chrono::duration_cast<chrono::milliseconds>(
                 merge_end_time - merge_start_time).count() << "[ms]";
+}
+
+class BHeap {
+ private:
+  std::vector<int32_t> *heap;
+  IndexComparator *compare;
+
+  int l(int parent);
+  int r(int parent);
+  int par(int child);
+
+ public:
+  BHeap(std::vector<int32_t> *heap, IndexComparator *compare) : heap(heap), compare(compare) {}
+  void Insert(int element);
+  void DeleteMin();
+  int ExtractMin();
+  void showHeap();
+  int Size();
+  void heapifyup(int index);
+  void heapifydown(int index);
+  void heapify();
+};
+
+void BHeap::heapify() {
+  int length = heap->size();
+  for (int i = 0; i < length; i++) {
+    heapifydown(i);
+  }
+}
+
+int BHeap::Size() {
+  return heap->size();
+}
+void BHeap::Insert(int ele) {
+  heap->push_back(ele);
+  heapifyup(heap->size() -1);
+}
+void BHeap::DeleteMin() {
+  if (heap->size() == 0) {
+    cout<<"Heap is Empty"<<endl;
+    return;
+  }
+  (*heap)[0] = heap->at(heap->size() - 1);
+  heap->pop_back();
+  heapifydown(0);
+  cout<<"Element Deleted"<<endl;
+}
+int BHeap::ExtractMin() {
+  if (heap->size() == 0) {
+    return -1;
+  }
+  else
+    return heap->front();
+}
+void BHeap::showHeap() {
+  vector <int>::iterator pos = heap->begin();
+  cout<<"Heap --> ";
+  while (pos != heap->end()) {
+    cout<<*pos<<" ";
+    pos++;
+  }
+  cout<<endl;
+}
+int BHeap::l(int parent) {
+  int l = 2 * parent + 1;
+  if (l < heap->size())
+    return l;
+  else
+    return -1;
+}
+int BHeap::r(int parent) {
+  int r = 2 * parent + 2;
+  if (r < heap->size())
+    return r;
+  else
+    return -1;
+}
+int BHeap::par(int child) {
+  int p = (child - 1)/2;
+  if (child == 0)
+    return -1;
+  else
+    return p;
+}
+void BHeap::heapifyup(int in) {
+  if (in >= 0 && par(in) >= 0 && (*compare)(par(in), in)) {
+    int temp = (*heap)[in];
+    (*heap)[in] = (*heap)[par(in)];
+    (*heap)[par(in)] = temp;
+    heapifyup(par(in));
+  }
+}
+void BHeap::heapifydown(int in) {
+  int child = l(in);
+  int child1 = r(in);
+  if (child >= 0 && child1 >= 0 && (*compare)(child, child1)) {
+    child = child1;
+  }
+  if (child > 0 && (*heap)[in] > (*compare)(in, child)) {
+    int t = (*heap)[in];
+    (*heap)[in] = (*heap)[child];
+    (*heap)[child] = t;
+    heapifydown(child);
+  }
+}
+
+void sortandmerge2(int count,
+                  int arrays,
+                  cylon::CylonContext *ctx,
+                  arrow::MemoryPool *pool) {
+  std::vector<shared_ptr<arrow::Table>> tables;
+  std::vector<shared_ptr<arrow::Array>> sort_indices;
+  std::vector<shared_ptr<arrow::Array>> sort_cols;
+  for (int i = 0; i < arrays; i++) {
+    shared_ptr<arrow::Table> t;
+    create_int64_table_small(count, ctx, pool, t);
+    tables.push_back(t);
+  }
+
+  auto start_start = std::chrono::steady_clock::now();
+  // now lets sort
+  for (int i = 0; i < arrays; i++) {
+    std::shared_ptr<arrow::Table> t = tables[i];
+    std::shared_ptr<arrow::Array> a = t->column(0)->chunk(0);
+    std::shared_ptr<arrow::Array> index_sorted_column;
+    arrow::Status st = cylon::SortIndices(pool, a, &index_sorted_column);
+
+    std::shared_ptr<arrow::NumericArray<arrow::Int64Type>> sort =
+        static_pointer_cast<arrow::NumericArray<arrow::Int64Type>>(index_sorted_column);
+    sort_indices.push_back(index_sorted_column);
+    sort_cols.push_back(a);
+  }
+  auto join_end_time = std::chrono::steady_clock::now();
+  LOG(INFO) << "Sort "
+            << chrono::duration_cast<chrono::milliseconds>(
+                join_end_time - start_start).count() << "[ms]";
+  auto* indexes = new int32_t[arrays];
+  fill(indexes, indexes + arrays, 0);
+
+  std::vector<int32_t> merge_queue;
+  auto merge_start_time = std::chrono::steady_clock::now();
+  for (int32_t i = 0; i < arrays; i++) {
+    merge_queue.push_back(i);
+  }
+  IndexComparator cmp(&sort_cols, &sort_indices, indexes);
+  BHeap heap(&merge_queue, &cmp);
+  int c = 0, n = 0;
+  // heapify
+  heap.heapify();
+  // now merge
+  while (!merge_queue.empty()) {
+    int32_t p = merge_queue.front();
+    indexes[p] = indexes[p] + 1;
+    if (indexes[p] < count) {
+      heap.heapifydown(0);
+      n++;
+    } else {
+      heap.DeleteMin();
+    }
+    c++;
+  }
+  LOG(INFO) << c << " " << n;
+
+  auto merge_end_time = std::chrono::steady_clock::now();
+  LOG(INFO) << "Merge "
+            << chrono::duration_cast<chrono::milliseconds>(
+                merge_end_time - merge_start_time).count() << "[ms]";
+}
+
+void join_small(int count,
+                int arrays,
+                cylon::CylonContext *ctx,
+                arrow::MemoryPool *pool) {
+  std::vector<std::shared_ptr<arrow::Table>> left_tables;
+  std::vector<std::shared_ptr<arrow::Table>> right_tables;
+  for (int i = 0; i < arrays; i++) {
+    shared_ptr<arrow::Table> t;
+    create_int64_table_small(count, ctx, pool, t);
+    left_tables.push_back(t);
+    shared_ptr<arrow::Table> t2;
+    create_int64_table_small(count, ctx, pool, t2);
+    right_tables.push_back(t2);
+  }
+
+  std::vector<std::shared_ptr<arrow::Table>> join_tables;
+  auto start_start = std::chrono::steady_clock::now();
+  for (int i = 0; i < left_tables.size(); i++) {
+    auto lt = left_tables[i];
+    auto rt = right_tables[i];
+    shared_ptr<arrow::Table> joined;
+    cylon::join::joinTables(lt, rt, cylon::join::config::JoinConfig::InnerJoin(0, 0), &joined);
+    join_tables.push_back(joined);
+  }
+  auto join_end_time = std::chrono::steady_clock::now();
+  LOG(INFO) << "Sort "
+            << chrono::duration_cast<chrono::milliseconds>(
+                join_end_time - start_start).count() << "[ms]";
 }
 
