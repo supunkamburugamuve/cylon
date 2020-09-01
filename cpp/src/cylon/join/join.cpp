@@ -114,6 +114,10 @@ arrow::Status do_inplace_sorted_join(const std::shared_ptr<arrow::Table> &left_t
     LOG(FATAL) << "Failed when sorting left table to indices. " << status.ToString();
     return status;
   }
+//  LOG(INFO) << "OUT";
+//  for (int i = 0; i < left_index_sorted_column->length(); i++) {
+//    LOG(INFO) << left_index_sorted_column->Value(i);
+//  }
   auto t2 = std::chrono::high_resolution_clock::now();
   LOG(INFO) << "Left sorting time : "
             << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
@@ -125,6 +129,10 @@ arrow::Status do_inplace_sorted_join(const std::shared_ptr<arrow::Table> &left_t
     LOG(FATAL) << "Failed when sorting right table to indices. " << status.ToString();
     return status;
   }
+//  LOG(INFO) << "OUT2";
+//  for (int i = 0; i < right_index_sorted_column->length(); i++) {
+//    LOG(INFO) << right_index_sorted_column->Value(i);
+//  }
   t2 = std::chrono::high_resolution_clock::now();
   LOG(INFO) << "right sorting time : "
             << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
