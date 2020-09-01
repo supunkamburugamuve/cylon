@@ -59,8 +59,11 @@ arrow::Status build_final_table_with_inplace(
   std::shared_ptr<std::vector<int64_t>> indices_indexed = std::make_shared<std::vector<int64_t>>();
   indices_indexed->reserve(left_indices->size());
 
+  LOG(INFO) << "Left index";
   for (size_t i = 0; i < left_indices->size(); i++) {
-    indices_indexed->push_back(left_index_sorted_column->Value(i));
+    unsigned long kX = left_index_sorted_column->Value(i);
+    LOG(INFO) << kX; 
+    indices_indexed->push_back(kX);
   }
   left_index_sorted_column.reset();
   std::vector<std::shared_ptr<arrow::Array>> data_arrays;
@@ -91,8 +94,11 @@ arrow::Status build_final_table_with_inplace(
 
   indices_indexed->clear();
   indices_indexed->reserve(right_indices->size());
+  LOG(INFO) << "Right index";
   for (size_t i = 0; i < right_indices->size(); i++) {
-    indices_indexed->push_back(right_index_sorted_column->Value(i));
+    unsigned long kX = right_index_sorted_column->Value(i);
+    LOG(INFO) << kX;
+    indices_indexed->push_back(kX);
   }
   right_index_sorted_column.reset();
   // build arrays for right tab

@@ -545,7 +545,7 @@ arrow::Status do_join(const std::shared_ptr<arrow::Table> &left_tab,
                       arrow::MemoryPool *memory_pool) {
   switch (join_algorithm) {
     case cylon::join::config::SORT:
-      return do_sorted_join<ARROW_ARRAY_TYPE, CPP_KEY_TYPE>(left_tab,
+      return do_inplace_sorted_join<ARROW_ARRAY_TYPE, CPP_KEY_TYPE>(left_tab,
                                                             right_tab,
                                                             left_join_column_idx,
                                                             right_join_column_idx,
