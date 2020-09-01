@@ -48,16 +48,21 @@ Status HashPartition(cylon::CylonContext *ctx, cylon::Table *table,
     length = column->length();
   }
 
+  auto t1 = std::chrono::high_resolution_clock::now();
   // first we partition the table
   std::vector<int64_t> outPartitions;
   outPartitions.reserve(length);
   Status status = HashPartitionArrays(cylon::ToArrowPool(ctx), arrays, length,
                                       partitions, &outPartitions);
+  auto t2 = std::chrono::high_resolution_clock::now();
+  LOG(INFO) << "Calculating hash time : "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
   if (!status.is_ok()) {
     LOG(FATAL) << "Failed to create the hash partition";
     return status;
   }
 
+  t1 = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < table_->num_columns(); i++) {
     std::shared_ptr<arrow::DataType> type = table_->column(i)->chunk(0)->type();
     std::shared_ptr<arrow::Array> array = table_->column(i)->chunk(0);
@@ -78,6 +83,9 @@ Status HashPartition(cylon::CylonContext *ctx, cylon::Table *table,
       cols->push_back(x.second);
     }
   }
+  t2 = std::chrono::high_resolution_clock::now();
+  LOG(INFO) << "Building hashed table time : "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
   // now insert these array to
   for (const auto &x : data_arrays) {
     std::shared_ptr<arrow::Table> final_arrow_table = arrow::Table::Make(table_->schema(), *x.second);
