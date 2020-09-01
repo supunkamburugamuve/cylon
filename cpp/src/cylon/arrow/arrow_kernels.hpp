@@ -38,9 +38,10 @@ class ArrowArraySplitKernel {
    * @return
    */
   virtual int Split(std::shared_ptr<arrow::Array> &values,
-					const std::vector<int64_t> &partitions,
-					const std::vector<int32_t> &targets,
-					std::unordered_map<int, std::shared_ptr<arrow::Array>> &out) = 0;
+                    const std::vector<int64_t> &partitions,
+                    const std::vector<int32_t> &targets,
+                    std::unordered_map<int, std::shared_ptr<arrow::Array>> &out,
+                    std::vector<int> &counts) = 0;
  protected:
   std::shared_ptr<arrow::DataType> type_;
   arrow::MemoryPool *pool_;
@@ -54,21 +55,25 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
 	  ArrowArraySplitKernel(type, pool) {}
 
   int Split(std::shared_ptr<arrow::Array> &values,
-			const std::vector<int64_t> &partitions,
-			const std::vector<int32_t> &targets,
-			std::unordered_map<int, std::shared_ptr<arrow::Array>> &out) override {
+            const std::vector<int64_t> &partitions,
+            const std::vector<int32_t> &targets,
+            std::unordered_map<int, std::shared_ptr<arrow::Array>> &out,
+            std::vector<int> &counts) override {
 	auto reader =
 		std::static_pointer_cast<arrow::NumericArray<TYPE>>(values);
 	std::unordered_map<int, std::shared_ptr<arrow::NumericBuilder<TYPE>>> builders;
 
-	for (long target : targets) {
+	for (size_t i = 0; i < targets.size(); i++) {
+	  int target = targets[i];
+	  int count = counts[i];
 	  std::shared_ptr<arrow::NumericBuilder<TYPE>> b = std::make_shared<arrow::NumericBuilder<TYPE>>(type_, pool_);
+	  b->Reserve(count);
 	  builders.insert(std::pair<int, std::shared_ptr<arrow::NumericBuilder<TYPE>>>(target, b));
 	}
 
 	for (size_t i = 0; i < partitions.size(); i++) {
 	  std::shared_ptr<arrow::NumericBuilder<TYPE>> b = builders[partitions.at(i)];
-	  b->Append(reader->Value(i));
+	  b->UnsafeAppend(reader->Value(i));
 	}
 
 	for (long target : targets) {
@@ -88,9 +93,10 @@ class FixedBinaryArraySplitKernel : public ArrowArraySplitKernel {
 	  ArrowArraySplitKernel(type, pool) {}
 
   int Split(std::shared_ptr<arrow::Array> &values,
-			const std::vector<int64_t> &partitions,
-			const std::vector<int32_t> &targets,
-			std::unordered_map<int, std::shared_ptr<arrow::Array>> &out) override;
+            const std::vector<int64_t> &partitions,
+            const std::vector<int32_t> &targets,
+            std::unordered_map<int, std::shared_ptr<arrow::Array>> &out,
+            std::vector<int> &counts) override;
 };
 
 class BinaryArraySplitKernel : public ArrowArraySplitKernel {
@@ -100,9 +106,10 @@ class BinaryArraySplitKernel : public ArrowArraySplitKernel {
 	  ArrowArraySplitKernel(type, pool) {}
 
   int Split(std::shared_ptr<arrow::Array> &values,
-			const std::vector<int64_t> &partitions,
-			const std::vector<int32_t> &targets,
-			std::unordered_map<int, std::shared_ptr<arrow::Array>> &out) override;
+            const std::vector<int64_t> &partitions,
+            const std::vector<int32_t> &targets,
+            std::unordered_map<int, std::shared_ptr<arrow::Array>> &out,
+            std::vector<int> &counts) override;
 };
 
 using UInt8ArraySplitter = ArrowArrayNumericSplitKernel<arrow::UInt8Type>;

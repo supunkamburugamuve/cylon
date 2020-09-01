@@ -51,9 +51,10 @@ Status HashPartition(cylon::CylonContext *ctx, cylon::Table *table,
   auto t1 = std::chrono::high_resolution_clock::now();
   // first we partition the table
   std::vector<int64_t> outPartitions;
+  std::vector<int> counts(no_of_partitions, 0);
   outPartitions.reserve(length);
-  Status status = HashPartitionArrays(cylon::ToArrowPool(ctx), arrays, length,
-                                      partitions, &outPartitions);
+  Status status = HashPartitionArrays2(cylon::ToArrowPool(ctx), arrays, length,
+                                      partitions, &outPartitions, counts);
   auto t2 = std::chrono::high_resolution_clock::now();
   LOG(INFO) << "Calculating hash time : "
             << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
@@ -76,7 +77,7 @@ Status HashPartition(cylon::CylonContext *ctx, cylon::Table *table,
 
     // this one outputs arrays for each target as a map
     std::unordered_map<int, std::shared_ptr<arrow::Array>> splited_arrays;
-    splitKernel->Split(array, outPartitions, partitions, splited_arrays);
+    splitKernel->Split(array, outPartitions, partitions, splited_arrays, counts);
 
     for (const auto &x : splited_arrays) {
       std::shared_ptr<std::vector<std::shared_ptr<arrow::Array>>> cols = data_arrays[x.first];

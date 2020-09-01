@@ -127,7 +127,8 @@ bool ArrowJoinWithPartition::isComplete() {
 
       // this one outputs arrays for each target as a map
       std::unordered_map<int, std::shared_ptr<arrow::Array>> arrays;
-      splitKernel->Split(array, outPartitions, targets_, arrays);
+      std::vector<int> a(10);
+      splitKernel->Split(array, outPartitions, targets_, arrays, a);
 
       for (const auto &x : arrays) {
         std::shared_ptr<std::vector<std::shared_ptr<arrow::Array>>> cols = data_arrays[x.first];
@@ -174,7 +175,8 @@ bool ArrowJoinWithPartition::isComplete() {
 
       // this one outputs arrays for each target as a map
       std::unordered_map<int, std::shared_ptr<arrow::Array>> arrays;
-      splitKernel->Split(array, outPartitions, targets_, arrays);
+      std::vector<int> a(1);
+      splitKernel->Split(array, outPartitions, targets_, arrays, a);
 
       for (const auto &x : arrays) {
         std::shared_ptr<std::vector<std::shared_ptr<arrow::Array>>> cols = data_arrays[x.first];

@@ -67,6 +67,35 @@ cylon::Status HashPartitionArray(arrow::MemoryPool *pool,
   return cylon::Status::OK();
 }
 
+cylon::Status HashPartitionArrays2(arrow::MemoryPool *pool,
+                                  const std::vector<std::shared_ptr<arrow::Array>> &values,
+                                  int64_t length,
+                                  const std::vector<int> &targets,
+                                  std::vector<int64_t> *outPartitions,
+                                  std::vector<int> &counts) {
+  std::vector<std::shared_ptr<ArrowPartitionKernel>> hash_kernels;
+  for (const auto &array : values) {
+    auto hash_kernel = GetPartitionKernel(pool, array);
+    if (hash_kernel == NULLPTR) {
+      LOG(FATAL) << "Un-known type";
+      return cylon::Status(cylon::NotImplemented, "Not implemented or unsupported data type.");
+    }
+    hash_kernels.push_back(hash_kernel);
+  }
+
+  for (int64_t index = 0; index < length; index++) {
+    int64_t hash_code = 1;
+    int64_t array_index = 0;
+    for (const auto &array : values) {
+      hash_code = 31 * hash_code + hash_kernels[array_index++]->ToHash(array, index);
+    }
+    int kX = targets[hash_code % targets.size()];
+    outPartitions->push_back(kX);
+    counts[kX]++;
+  }
+  return cylon::Status::OK();
+}
+
 cylon::Status HashPartitionArrays(arrow::MemoryPool *pool,
                                   const std::vector<std::shared_ptr<arrow::Array>> &values,
                                   int64_t length,

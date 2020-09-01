@@ -61,9 +61,10 @@ cylon::Status CreateSplitter(const std::shared_ptr<arrow::DataType> &type,
 }
 
 int FixedBinaryArraySplitKernel::Split(std::shared_ptr<arrow::Array> &values,
-                                     const std::vector<int64_t> &partitions,
-                                     const std::vector<int32_t> &targets,
-                                     std::unordered_map<int, std::shared_ptr<arrow::Array> > &out) {
+                                       const std::vector<int64_t> &partitions,
+                                       const std::vector<int32_t> &targets,
+                                       std::unordered_map<int, std::shared_ptr<arrow::Array>> &out,
+                                       std::vector<int> &counts) {
   auto reader =
       std::static_pointer_cast<arrow::FixedSizeBinaryArray>(values);
   std::unordered_map<int, std::shared_ptr<arrow::FixedSizeBinaryBuilder>> builders;
@@ -97,7 +98,8 @@ int FixedBinaryArraySplitKernel::Split(std::shared_ptr<arrow::Array> &values,
 int BinaryArraySplitKernel::Split(std::shared_ptr<arrow::Array> &values,
                                   const std::vector<int64_t> &partitions,
                                   const std::vector<int32_t> &targets,
-                                  std::unordered_map<int, std::shared_ptr<arrow::Array> > &out) {
+                                  std::unordered_map<int, std::shared_ptr<arrow::Array>> &out,
+                                  std::vector<int> &counts) {
   auto reader =
       std::static_pointer_cast<arrow::BinaryArray>(values);
   std::unordered_map<int, std::shared_ptr<arrow::BinaryBuilder>> builders;

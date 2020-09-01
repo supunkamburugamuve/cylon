@@ -197,6 +197,13 @@ cylon::Status HashPartitionArrays(arrow::MemoryPool *pool,
                                   const std::vector<int> &targets,
                                   std::vector<int64_t> *outPartitions);
 
+cylon::Status HashPartitionArrays2(arrow::MemoryPool *pool,
+                                  const std::vector<std::shared_ptr<arrow::Array>> &values,
+                                  int64_t length,
+                                  const std::vector<int> &targets,
+                                  std::vector<int64_t> *outPartitions,
+                                  std::vector<int> &counts);
+
 class RowHashingKernel {
  private:
   std::vector<std::shared_ptr<ArrowPartitionKernel>> hash_kernels;
