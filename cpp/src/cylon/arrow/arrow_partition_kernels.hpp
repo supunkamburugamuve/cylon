@@ -121,23 +121,27 @@ class BinaryHashPartitionKernel : public ArrowPartitionKernel {
 template<typename TYPE, typename CTYPE>
 class NumericHashPartitionKernel : public ArrowPartitionKernel {
  public:
-  explicit NumericHashPartitionKernel(arrow::MemoryPool *pool) : ArrowPartitionKernel(pool) {}
+  std::hash<CTYPE> hasher;
+  explicit NumericHashPartitionKernel(arrow::MemoryPool *pool) : ArrowPartitionKernel(pool) {
+    hasher = std::hash<CTYPE>{};
+  }
 
   uint32_t ToHash(const std::shared_ptr<arrow::Array> &values,
                   int64_t index) override {
     auto reader = std::static_pointer_cast<arrow::NumericArray<TYPE>>(values);
     auto type = std::static_pointer_cast<arrow::FixedWidthType>(values->type());
-    int bitWidth = type->bit_width();
+//    int bitWidth = type->bit_width();
     if (values->IsNull(index)) {
       return 0;
     } else {
       CTYPE lValue = reader->Value(index);
 
       uint32_t hash = 0;
-      uint32_t seed = 0;
-      void *val = (void *) &(lValue);
+//      uint32_t seed = 0;
+//      void *val = (void *) &(lValue);
       // do the hash as we know the bit width
-      cylon::util::MurmurHash3_x86_32(val, bitWidth / 8, seed, &hash);
+//      cylon::util::MurmurHash3_x86_32(val, bitWidth / 8, seed, &hash);
+      hash = hasher(lValue);
       return hash;
     }
 
