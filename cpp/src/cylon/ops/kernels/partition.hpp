@@ -22,7 +22,7 @@
 #include <table.hpp>
 namespace cylon {
 namespace kernel {
-Status HashPartition(CylonContext *ctx, const std::shared_ptr<Table> table,
+Status HashPartition(CylonContext *ctx, cylon::Table *table,
                      const std::vector<int> &hash_columns, int no_of_partitions,
                      std::unordered_map<int, std::shared_ptr<Table>> *out);
 }

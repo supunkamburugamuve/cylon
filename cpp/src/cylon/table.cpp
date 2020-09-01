@@ -306,7 +306,7 @@ Status Table::Sort(int sort_column, shared_ptr<cylon::Table> &out) {
 
 Status Table::HashPartition(const std::vector<int> &hash_columns, int no_of_partitions,
                             std::unordered_map<int, std::shared_ptr<cylon::Table>> *out) {
-  return cylon::kernel::HashPartition(this->ctx, std::shared_ptr<Table>(this),
+  return cylon::kernel::HashPartition(this->ctx, this,
                                       hash_columns, no_of_partitions, out);
 }
 

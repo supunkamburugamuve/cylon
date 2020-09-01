@@ -28,7 +28,7 @@ bool cylon::PartitionOp::Execute(int tag, std::shared_ptr<Table> table) {
   std::unordered_map<int, std::shared_ptr<Table>> out;
 
   // todo pass ctx as a shared pointer
-  cylon::kernel::HashPartition(&*this->ctx_, table, *this->config->HashColumns(),
+  cylon::kernel::HashPartition(&*this->ctx_, table.get(), *this->config->HashColumns(),
                                this->config->NoOfPartitions(), &out);
   for (auto const &tab:out) {
     this->InsertToAllChildren(tab.first, tab.second);
