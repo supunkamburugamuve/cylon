@@ -153,14 +153,21 @@ Status ShuffleTwoTables(CylonContext *ctx,
                         std::shared_ptr<arrow::Table> *right_table_out) {
   LOG(INFO) << "Shuffling two tables with total rows : "
             << left_table->Rows() + right_table->Rows();
+  auto t1 = std::chrono::high_resolution_clock::now();
   auto status = Shuffle(ctx, left_table, left_hash_columns,
                         ctx->GetNextSequence(), left_table_out);
   if (status.is_ok()) {
-    LOG(INFO) << "Left table shuffled";
+    auto t2 = std::chrono::high_resolution_clock::now();
+    LOG(INFO) << "Left shuffle time : "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
     status = Shuffle(ctx, right_table, right_hash_columns,
                      ctx->GetNextSequence(), right_table_out);
+
     if (status.is_ok()) {
       LOG(INFO) << "Right table shuffled";
+      auto t3 = std::chrono::high_resolution_clock::now();
+      LOG(INFO) << "Right shuffle time : "
+                << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
     }
   }
   return status;
