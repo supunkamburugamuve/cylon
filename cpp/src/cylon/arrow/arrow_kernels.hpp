@@ -19,6 +19,7 @@
 #include <arrow/compute/kernel.h>
 #include <glog/logging.h>
 #include "../status.hpp"
+#include "util/sort.hpp"
 
 namespace cylon {
 
@@ -191,6 +192,75 @@ using DoubleArraySorter = ArrowArrayNumericSortKernel<arrow::DoubleType>;
 arrow::Status SortIndices(arrow::MemoryPool *memory_pool, std::shared_ptr<arrow::Array> values,
 						  std::shared_ptr<arrow::Array> *offsets);
 
+
+class ArrowArrayInplaceSortKernel {
+ public:
+  explicit ArrowArrayInplaceSortKernel(std::shared_ptr<arrow::DataType> type,
+                                arrow::MemoryPool *pool) : type_(type), pool_(pool) {}
+
+  /**
+   * Sort the values in the column and return an array with the indices
+   * @param ctx
+   * @param values
+   * @param targets
+   * @param out_length
+   * @param out
+   * @return
+   */
+  virtual int Sort(std::shared_ptr<arrow::Array> values,
+                   std::shared_ptr<arrow::UInt64Array> *out) = 0;
+ protected:
+  std::shared_ptr<arrow::DataType> type_;
+  arrow::MemoryPool *pool_;
+};
+
+template<typename TYPE>
+class ArrowArrayInplaceNumericSortKernel : public ArrowArrayInplaceSortKernel {
+ public:
+  using T = typename TYPE::c_type;
+
+  explicit ArrowArrayInplaceNumericSortKernel(std::shared_ptr<arrow::DataType> type,
+                                       arrow::MemoryPool *pool) :
+      ArrowArrayInplaceSortKernel(type, pool) {}
+
+  int Sort(std::shared_ptr<arrow::Array> values,
+           std::shared_ptr<arrow::UInt64Array> *offsets) override {
+    auto array = std::static_pointer_cast<arrow::NumericArray<TYPE>>(values);
+    std::shared_ptr<arrow::ArrayData> data = array->data();
+    // get the first buffer as a mutable buffer
+    T *left_data = data->GetMutableValues<T>(1);
+    std::shared_ptr<arrow::Buffer> indices_buf;
+    int64_t buf_size = values->length() * sizeof(uint64_t);
+    arrow::Status status = AllocateBuffer(pool_, buf_size + 1, &indices_buf);
+    if (status != arrow::Status::OK()) {
+      LOG(FATAL) << "Failed to allocate sort indices - " << status.message();
+      return -1;
+    }
+    auto *indices_begin = reinterpret_cast<int64_t *>(indices_buf->mutable_data());
+    for (int64_t i = 0; i < values->length(); i++) {
+      indices_begin[i] = i;
+    }
+    cylon::util::quicksort(left_data, 0, values->length(), indices_begin);
+    *offsets = std::make_shared<arrow::UInt64Array>(values->length(), indices_buf);
+    return 0;
+  }
+};
+
+using UInt8ArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::UInt8Type>;
+using UInt16ArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::UInt16Type>;
+using UInt32ArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::UInt32Type>;
+using UInt64ArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::UInt64Type>;
+using Int8ArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::Int8Type>;
+using Int16ArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::Int16Type>;
+using Int32ArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::Int32Type>;
+using Int64ArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::Int64Type>;
+using HalfFloatArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::HalfFloatType>;
+using FloatArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::FloatType>;
+using DoubleArrayInplaceSorter = ArrowArrayInplaceNumericSortKernel<arrow::DoubleType>;
+
+arrow::Status SortIndicesInPlace(arrow::MemoryPool *memory_pool,
+                          std::shared_ptr<arrow::Array> values,
+                          std::shared_ptr<arrow::UInt64Array> *offsets);
 }
 
 #endif //CYLON_ARROW_KERNELS_H

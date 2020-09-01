@@ -265,4 +265,45 @@ arrow::Status SortIndices(arrow::MemoryPool *memory_pool, std::shared_ptr<arrow:
   return arrow::Status::OK();
 }
 
+int CreateInplaceSorter(std::shared_ptr<arrow::DataType> type,
+                 arrow::MemoryPool *pool,
+                 std::shared_ptr<ArrowArrayInplaceSortKernel> *out) {
+  ArrowArrayInplaceSortKernel *kernel;
+  switch (type->id()) {
+    case arrow::Type::UINT8:kernel = new UInt8ArrayInplaceSorter(type, pool);
+      break;
+    case arrow::Type::INT8:kernel = new Int8ArrayInplaceSorter(type, pool);
+      break;
+    case arrow::Type::UINT16:kernel = new UInt16ArrayInplaceSorter(type, pool);
+      break;
+    case arrow::Type::INT16:kernel = new Int16ArrayInplaceSorter(type, pool);
+      break;
+    case arrow::Type::UINT32:kernel = new UInt32ArrayInplaceSorter(type, pool);
+      break;
+    case arrow::Type::INT32:kernel = new Int32ArrayInplaceSorter(type, pool);
+      break;
+    case arrow::Type::UINT64:kernel = new UInt64ArrayInplaceSorter(type, pool);
+      break;
+    case arrow::Type::INT64:kernel = new Int64ArrayInplaceSorter(type, pool);
+      break;
+    case arrow::Type::FLOAT:kernel = new FloatArrayInplaceSorter(type, pool);
+      break;
+    case arrow::Type::DOUBLE:kernel = new DoubleArrayInplaceSorter(type, pool);
+      break;
+    default:LOG(FATAL) << "Un-known type";
+      return -1;
+  }
+  out->reset(kernel);
+  return 0;
+}
+
+arrow::Status SortIndicesInPlace(arrow::MemoryPool *memory_pool,
+                          std::shared_ptr<arrow::Array> values,
+                          std::shared_ptr<arrow::UInt64Array> *offsets) {
+  std::shared_ptr<ArrowArrayInplaceSortKernel> out;
+  CreateInplaceSorter(values->type(), memory_pool, &out);
+  out->Sort(values, offsets);
+  return arrow::Status::OK();
+}
+
 }  // namespace cylon
