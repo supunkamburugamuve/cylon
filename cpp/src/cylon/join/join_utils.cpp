@@ -97,7 +97,7 @@ arrow::Status build_final_table_with_inplace(
   right_index_sorted_column.reset();
   // build arrays for right tab
   const std::vector<std::shared_ptr<arrow::ChunkedArray>> &rvector = right_tab->columns();
-  for (size_t i = 0; i < kVector.size(); i++) {
+  for (size_t i = 0; i < rvector.size(); i++) {
     std::shared_ptr<arrow::ChunkedArray> ca = rvector[i];
     std::shared_ptr<arrow::Array> destination_col_array;
     arrow::Status status;
