@@ -106,7 +106,6 @@ arrow::Status build_final_table_with_inplace(
                                                   ca->chunk(0),
                                                   &destination_col_array,
                                                   memory_pool);
-      right_index_sorted_column.reset();
     } else {
       status = cylon::util::copy_array_by_indices(indices_indexed,
                                                   ca->chunk(0),
