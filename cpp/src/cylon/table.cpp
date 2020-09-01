@@ -82,8 +82,13 @@ cylon::Status Shuffle(cylon::CylonContext *ctx,
                       std::shared_ptr<arrow::Table> *table_out) {
   std::unordered_map<int, std::shared_ptr<cylon::Table>> partitioned_tables{};
   // partition the tables locally
+  auto t1 = std::chrono::high_resolution_clock::now();
   table->HashPartition(hash_columns, ctx->GetWorldSize(), &partitioned_tables);
   std::shared_ptr<arrow::Schema> schema = table->get_table()->schema();
+  auto t2 = std::chrono::high_resolution_clock::now();
+  LOG(INFO) << "Breaking tables time : "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+
   // we are going to free if retain is set to false
   if (!table->IsRetain()) {
     table.reset();
