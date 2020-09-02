@@ -8,6 +8,7 @@
 #include <queue>
 #include <algorithm>
 #include <ops/kernels/partition.hpp>
+#include <map>
 
 void sortmerge_vectors(int count, int arrays, cylon::CylonContext *ctx,
                        arrow::MemoryPool *pool);
@@ -51,8 +52,8 @@ void create_int64_table_small(int count,
   arrow::Status st = left_id_builder.Reserve(count);
   st = cost_builder.Reserve(count);
   for (uint64_t i = 0; i < count; i++) {
-    int64_t l = next_random_num() % range;
-    int64_t v = next_random_num() % range;
+    int64_t l = rand() % range;
+    int64_t v = rand() % range;
     left_id_builder.UnsafeAppend(l);
     cost_builder.UnsafeAppend(v);
   }
@@ -532,8 +533,12 @@ void split(int count,
            arrow::MemoryPool *pool) {
   std::shared_ptr<arrow::Table> large_left;
   int length = arrays * count;
-  create_int64_table_small(100, ctx, pool, large_left);
+  create_int64_table_small(length, ctx, pool, large_left);
 
+  auto reader1 =
+      std::static_pointer_cast<arrow::Int64Array>(large_left->column(0)->chunk(0));
+  auto reader2 =
+      std::static_pointer_cast<arrow::Int64Array>(large_left->column(1)->chunk(0));
   std::vector<int64_t> v;
   std::vector<int> counts(arrays, 0);
   std::vector<int64_t> values;
@@ -544,34 +549,47 @@ void split(int count,
     values.push_back(rand());
   }
 
-  std::vector<std::shared_ptr<arrow::Int64Builder>> builder1;
-  std::vector<std::shared_ptr<arrow::Int64Builder>> builder2;
+//  std::vector<std::shared_ptr<arrow::Int64Builder>> builder1;
+//  std::vector<std::shared_ptr<arrow::Int64Builder>> builder2;
+//  for (int i = 0; i < arrays; i++) {
+//    std::shared_ptr<arrow::Int64Builder> b = std::make_shared<arrow::Int64Builder>(large_left->column(0)->type(), pool);
+//    builder1.push_back(b);
+//    b->Reserve(counts[i]);
+//    std::shared_ptr<arrow::Int64Builder> b2 = std::make_shared<arrow::Int64Builder>(large_left->column(0)->type(), pool);
+//    builder2.push_back(b2);
+//    b2->Reserve(counts[i]);
+//  }
+
+  std::map<int, std::shared_ptr<arrow::Int64Builder>> builder1;
+  std::map<int, std::shared_ptr<arrow::Int64Builder>> builder2;
   for (int i = 0; i < arrays; i++) {
     std::shared_ptr<arrow::Int64Builder> b = std::make_shared<arrow::Int64Builder>(large_left->column(0)->type(), pool);
-    builder1.push_back(b);
+    builder1.insert(std::pair<int, std::shared_ptr<arrow::Int64Builder>>(i, b));
     b->Reserve(counts[i]);
     std::shared_ptr<arrow::Int64Builder> b2 = std::make_shared<arrow::Int64Builder>(large_left->column(0)->type(), pool);
-    builder2.push_back(b2);
+    builder2.insert(std::pair<int, std::shared_ptr<arrow::Int64Builder>>(i, b2));
     b2->Reserve(counts[i]);
   }
 
   auto start_start = std::chrono::steady_clock::now();
   for (int i = 0; i < length; i++) {
     int target = v[i];
-    std::shared_ptr<arrow::Int64Builder> b1 = builder1[target];
+    std::shared_ptr<arrow::Int64Builder> b1 = builder1[v[i]];
 //    std::shared_ptr<arrow::Int64Builder> b2 = builder2[target];
     
-    b1->UnsafeAppend(values[i]);
+//    b1->UnsafeAppend(values[i]);
+    b1->UnsafeAppend(reader1->Value(i));
 //    b2->UnsafeAppend(values[i]);
   }
 
   for (int i = 0; i < length; i++) {
     int target = v[i];
 //    std::shared_ptr<arrow::Int64Builder> b1 = builder1[target];
-    std::shared_ptr<arrow::Int64Builder> b2 = builder2[target];
+    std::shared_ptr<arrow::Int64Builder> b2 = builder2[v[i]];
 
 //    b1->UnsafeAppend(values[i]);
-    b2->UnsafeAppend(values[i]);
+//    b2->UnsafeAppend(values[i]);
+    b2->UnsafeAppend(reader2->Value(i));
   }
 
   for (int i = 0; i < arrays; i++) {
