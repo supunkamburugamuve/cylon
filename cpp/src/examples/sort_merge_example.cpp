@@ -22,6 +22,11 @@ void join_small2(int count,
                 cylon::CylonContext *ctx,
                 arrow::MemoryPool *pool);
 
+void split(int count,
+           int arrays,
+           cylon::CylonContext *ctx,
+           arrow::MemoryPool *pool);
+
 uint64_t next_random_num() {
   uint64_t randnumber = 0;
   for (int i = 19; i >= 1; i--) {
@@ -142,8 +147,8 @@ void sortandmerge2(int count,
 
 int main(int argc, char *argv[]) {
   srand(time(NULL));
-  int count = 500;
-  int arrays = 80;
+  int count = 400000;
+  int arrays = 100;
   if (argc >= 3) {
     count = stoull(argv[1]);;
     arrays = stoull(argv[2]);;
@@ -154,7 +159,8 @@ int main(int argc, char *argv[]) {
   arrow::MemoryPool *pool = arrow::default_memory_pool();
 //  sortandmerge2(count, arrays, ctx, pool);
 //  sortmerge_vectors(count, arrays, ctx, pool);
-  join_small2(count, arrays, ctx, pool);
+//  join_small2(count, arrays, ctx, pool);
+  split(count, arrays, ctx, pool);
 
   ctx->Finalize();
 }
@@ -513,6 +519,68 @@ void join_small2(int count,
     shared_ptr<arrow::Table> joined;
     cylon::join::joinTables(leftt, rightt, cylon::join::config::JoinConfig::InnerJoin(0, 0), &joined);
     join_tables.push_back(joined);
+  }
+  auto join_end_time = std::chrono::steady_clock::now();
+  LOG(INFO) << "Sort "
+            << chrono::duration_cast<chrono::milliseconds>(
+                join_end_time - start_start).count() << "[ms]";
+}
+
+void split(int count,
+           int arrays,
+           cylon::CylonContext *ctx,
+           arrow::MemoryPool *pool) {
+  std::shared_ptr<arrow::Table> large_left;
+  int length = arrays * count;
+  create_int64_table_small(100, ctx, pool, large_left);
+
+  std::vector<int64_t> v;
+  std::vector<int> counts(arrays, 0);
+  std::vector<int64_t> values;
+  for (int i = 0; i < length; i++) {
+    int kX = rand() % arrays;
+    v.push_back(kX);
+    counts[kX]++;
+    values.push_back(rand());
+  }
+
+  std::vector<std::shared_ptr<arrow::Int64Builder>> builder1;
+  std::vector<std::shared_ptr<arrow::Int64Builder>> builder2;
+  for (int i = 0; i < arrays; i++) {
+    std::shared_ptr<arrow::Int64Builder> b = std::make_shared<arrow::Int64Builder>(large_left->column(0)->type(), pool);
+    builder1.push_back(b);
+    b->Reserve(counts[i]);
+    std::shared_ptr<arrow::Int64Builder> b2 = std::make_shared<arrow::Int64Builder>(large_left->column(0)->type(), pool);
+    builder2.push_back(b2);
+    b2->Reserve(counts[i]);
+  }
+
+  auto start_start = std::chrono::steady_clock::now();
+  for (int i = 0; i < length; i++) {
+    int target = v[i];
+    std::shared_ptr<arrow::Int64Builder> b1 = builder1[target];
+//    std::shared_ptr<arrow::Int64Builder> b2 = builder2[target];
+    
+    b1->UnsafeAppend(values[i]);
+//    b2->UnsafeAppend(values[i]);
+  }
+
+  for (int i = 0; i < length; i++) {
+    int target = v[i];
+//    std::shared_ptr<arrow::Int64Builder> b1 = builder1[target];
+    std::shared_ptr<arrow::Int64Builder> b2 = builder2[target];
+
+//    b1->UnsafeAppend(values[i]);
+    b2->UnsafeAppend(values[i]);
+  }
+
+  for (int i = 0; i < arrays; i++) {
+    std::shared_ptr<arrow::Array> array1;
+    std::shared_ptr<arrow::Array> array2;
+    std::shared_ptr<arrow::Int64Builder> b1 = builder1[i];  
+    std::shared_ptr<arrow::Int64Builder> b2 = builder2[i];
+    b1->Finish(&array1);
+    b2->Finish(&array2);
   }
   auto join_end_time = std::chrono::steady_clock::now();
   LOG(INFO) << "Sort "
