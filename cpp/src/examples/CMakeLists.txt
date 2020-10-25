@@ -23,6 +23,7 @@ tx_add_exe(compute_example)
 tx_add_exe(groupby_benchmark_example)
 tx_add_exe(groupby_pipeline_example)
 tx_add_exe(groupby_example)
+tx_add_exe(quicksort_example)
 
 
 #macro(tx_add_test_exe EXENAME)
