@@ -310,4 +310,37 @@ arrow::Status SortIndicesInPlace(arrow::MemoryPool *memory_pool,
   return arrow::Status::OK();
 }
 
+arrow::Status SortIndicesTwoArraysInPlace(arrow::MemoryPool *pool,
+                                          const std::shared_ptr<arrow::Array>& values,
+                                          std::shared_ptr<arrow::Array> second_values) {
+  ArrowTwoArraysInplaceSortKernel *kernel;
+  auto type = values->type();
+  switch (type->id()) {
+    case arrow::Type::UINT8:kernel = new UInt8TwoArraysInplaceSorter(type, pool);
+      break;
+    case arrow::Type::INT8:kernel = new Int8TwoArraysInplaceSorter(type, pool);
+      break;
+    case arrow::Type::UINT16:kernel = new UInt16TwoArraysInplaceSorter(type, pool);
+      break;
+    case arrow::Type::INT16:kernel = new Int16TwoArraysInplaceSorter(type, pool);
+      break;
+    case arrow::Type::UINT32:kernel = new UInt32TwoArraysInplaceSorter(type, pool);
+      break;
+    case arrow::Type::INT32:kernel = new Int32TwoArraysInplaceSorter(type, pool);
+      break;
+    case arrow::Type::UINT64:kernel = new UInt64TwoArraysInplaceSorter(type, pool);
+      break;
+    case arrow::Type::INT64:kernel = new Int64TwoArraysInplaceSorter(type, pool);
+      break;
+    case arrow::Type::FLOAT:kernel = new FloatTwoArraysInplaceSorter(type, pool);
+      break;
+    case arrow::Type::DOUBLE:kernel = new DoubleTwoArraysInplaceSorter(type, pool);
+      break;
+    default:LOG(FATAL) << "Un-known type";
+      return arrow::Status::Invalid("Invalid type");
+  }
+  kernel->Sort(values, std::move(second_values));
+  return arrow::Status::OK();
+}
+
 }  // namespace cylon

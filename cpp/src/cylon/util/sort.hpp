@@ -152,6 +152,45 @@ void quicksort(T *arr, int low, int high, T2 *t2) {
   quicksort_imp(arr, low, high - 1, t2);
 }
 
+template <typename T>
+int64_t partition_bytes(T *t, uint8_t *t2, int start, int end, uint32_t byte_width, uint8_t *tmp) {
+  T pivot = t[end];
+  int i = start - 1;
+  for (int j = start; j < end; j++) {
+    if (t[j] <= pivot) {
+      i++;
+      std::memcpy(tmp, t2 + i * byte_width, byte_width);
+      std::memcpy(t2 + i * byte_width, t2 + j * byte_width, byte_width);
+      std::memcpy(t2 + j * byte_width, tmp, byte_width);
+//      std::swap(t2[i], t2[j]);
+      std::swap(t[i], t[j]);
+    }
+  }
+  std::swap(t[i + 1], t[end]);
+
+  std::memcpy(tmp, t2 + (i + 1)* byte_width, byte_width);
+  std::memcpy(t2 + (i + 1) * byte_width, t2 + end * byte_width, byte_width);
+  std::memcpy(t2 + end * byte_width, tmp, byte_width);
+
+//  std::swap(t2[i + 1], t2[end]);
+  return i + 1;
+}
+
+template <typename T>
+void quicksort_imp_bytes(T *arr, int low, int high, uint8_t *t2,
+                         uint32_t byte_width, uint8_t *tmp) {
+  if (low < high) {
+    int p = partition_bytes(arr, t2, low, high, byte_width, tmp);
+    quicksort_imp_bytes(arr, low, p - 1, t2, byte_width, tmp);
+    quicksort_imp_bytes(arr, p + 1, high, t2, byte_width, tmp);
+  }
+}
+
+template <typename T>
+void quicksort_bytes(T *arr, int low, int high, uint8_t *t2, uint32_t byte_width, uint8_t *tmp) {
+  quicksort_imp_bytes(arr, low, high - 1, t2, byte_width, tmp);
+}
+
 }  // namespace util
 }  // namespace cylon
 

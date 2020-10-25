@@ -268,6 +268,71 @@ arrow::Status SortIndicesInPlace(arrow::MemoryPool *memory_pool,
                                  std::shared_ptr<arrow::Array> values,
                                  std::shared_ptr<arrow::UInt64Array> *offsets);
 
+class ArrowTwoArraysInplaceSortKernel {
+ public:
+  explicit ArrowTwoArraysInplaceSortKernel(std::shared_ptr<arrow::DataType> type,
+                                           arrow::MemoryPool *pool) : type_(type), pool_(pool) {}
+
+  /**
+   * Sort the values in the column and return an array with the indices
+   * @param ctx
+   * @param values
+   * @param targets
+   * @param out_length
+   * @param out
+   * @return
+   */
+  virtual int Sort(std::shared_ptr<arrow::Array> values,
+                   std::shared_ptr<arrow::Array> second_values) = 0;
+ protected:
+  std::shared_ptr<arrow::DataType> type_;
+  arrow::MemoryPool *pool_;
+};
+
+template<typename TYPE>
+class ArrowTwoArraysInplaceNumericSortKernel : public ArrowTwoArraysInplaceSortKernel {
+ public:
+  using T = typename TYPE::c_type;
+
+  explicit ArrowTwoArraysInplaceNumericSortKernel(std::shared_ptr<arrow::DataType> type,
+                                                  arrow::MemoryPool *pool) :
+      ArrowTwoArraysInplaceSortKernel(type, pool) {}
+
+  int Sort(std::shared_ptr<arrow::Array> values,
+           std::shared_ptr<arrow::Array> second_values) override {
+    auto array = std::static_pointer_cast<arrow::NumericArray<TYPE>>(values);
+    std::shared_ptr<arrow::ArrayData> data = array->data();
+    // get the first buffer as a mutable buffer
+    T *left_data = data->GetMutableValues<T>(1);
+    int64_t length = values->length();
+
+    std::shared_ptr<arrow::ArrayData> second_data = second_values->data();
+    std::shared_ptr<arrow::Buffer> buffer = second_data->buffers[1];
+    int64_t bit_width = second_values->type()->layout().bit_widths[0];
+    uint8_t *b = buffer->mutable_data() + second_data->offset * bit_width / 8;
+    auto *tmp = new uint8_t[bit_width / 8];
+    cylon::util::quicksort_bytes(left_data, 0, length, b, (uint32_t) bit_width / 8, tmp);
+    delete[] tmp;
+    return 0;
+  }
+};
+
+using UInt8TwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::UInt8Type>;
+using UInt16TwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::UInt16Type>;
+using UInt32TwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::UInt32Type>;
+using UInt64TwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::UInt64Type>;
+using Int8TwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::Int8Type>;
+using Int16TwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::Int16Type>;
+using Int32TwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::Int32Type>;
+using Int64TwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::Int64Type>;
+using HalfFloatTwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::HalfFloatType>;
+using FloatTwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::FloatType>;
+using DoubleTwoArraysInplaceSorter = ArrowTwoArraysInplaceNumericSortKernel<arrow::DoubleType>;
+
+arrow::Status SortIndicesTwoArraysInPlace(arrow::MemoryPool *memory_pool,
+                                          const std::shared_ptr<arrow::Array>& values,
+                                          std::shared_ptr<arrow::Array> second_values);
+
 }
 
 #endif //CYLON_ARROW_KERNELS_H
