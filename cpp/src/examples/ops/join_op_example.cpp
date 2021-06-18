@@ -57,8 +57,7 @@ int main(int argc, char *argv[]) {
 
   arrow::MemoryPool *pool = arrow::default_memory_pool();
   std::shared_ptr<arrow::Table> left_table, right_table;
-//  create_binary_table(argv, ctx, pool, left_table, right_table);
-/*  create_int64_table(argv, ctx, pool, left_table, right_table);
+  create_int64_table(argv, ctx, pool, left_table, right_table);
   ctx->Barrier();
 
   std::shared_ptr<cylon::Table> first_table, second_table, joined;
@@ -74,11 +73,11 @@ int main(int argc, char *argv[]) {
     LOG(INFO) << "Table reading failed " << argv[2];
     ctx->Finalize();
     return 1;
-  }*/
+  }
 
-  std::shared_ptr<cylon::Table> first_table, second_table, joined;
-  cylon::FromCSV(ctx, "/tmp/left_" + std::to_string(ctx->GetRank()) + ".csv", first_table);
-  cylon::FromCSV(ctx, "/tmp/right_" + std::to_string(ctx->GetRank()) + ".csv", second_table);
+//  std::shared_ptr<cylon::Table> first_table, second_table, joined;
+//  cylon::FromCSV(ctx, "/tmp/left_" + std::to_string(ctx->GetRank()) + ".csv", first_table);
+//  cylon::FromCSV(ctx, "/tmp/right_" + std::to_string(ctx->GetRank()) + ".csv", second_table);
 
 //  cylon::WriteCSV(first_table, "/tmp/left_" + std::to_string(ctx->GetRank()) + ".csv");
 //  cylon::WriteCSV(second_table, "/tmp/right_" + std::to_string(ctx->GetRank()) + ".csv");
@@ -94,7 +93,7 @@ int main(int argc, char *argv[]) {
   const cylon::ResultsCallback &callback = [&](int tag, const std::shared_ptr<cylon::Table> &table) {
     LOG(INFO) << tag << " Result received " << table->Rows();
 //    table->Print();
-    cylon::WriteCSV(table, "/tmp/out_" + std::to_string(ctx->GetRank()) + ".csv");
+//    cylon::WriteCSV(table, "/tmp/out_" + std::to_string(ctx->GetRank()) + ".csv");
   };
 
   const auto &join_config = cylon::join::config::JoinConfig::InnerJoin(0, 0);

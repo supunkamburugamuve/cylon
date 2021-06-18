@@ -17,6 +17,7 @@
 #include <glog/logging.h>
 
 #include <type_traits>
+#include <math.h>
 
 #include "../util/macros.hpp"
 #include "../util/sort.hpp"
@@ -51,12 +52,30 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
       RETURN_CYLON_STATUS_IF_ARROW_FAILED(builders.back()->Reserve(counts[i]));
     }
 
+//    size_t offset = 0;
+//    for (const auto &array : values->chunks()) {
+//      std::shared_ptr<ARROW_ARRAY_T> casted_array = std::static_pointer_cast<ARROW_ARRAY_T>(array);
+//      const int64_t arr_len = array->length();
+//      for (int64_t i = 0; i < arr_len; i++, offset++) {
+//        builders[target_partitions[offset]]->UnsafeAppend(casted_array->Value(i));
+//      }
+//    }
+
+    int partitions_per_pass = 10;
+    int num_passes = ceil(((double)num_partitions) / partitions_per_pass);
     size_t offset = 0;
-    for (const auto &array : values->chunks()) {
-      std::shared_ptr<ARROW_ARRAY_T> casted_array = std::static_pointer_cast<ARROW_ARRAY_T>(array);
-      const int64_t arr_len = array->length();
-      for (int64_t i = 0; i < arr_len; i++, offset++) {
-        builders[target_partitions[offset]]->UnsafeAppend(casted_array->Value(i));
+    for (int pass = 0; pass < num_passes; pass++) {
+      int pass_start_index = pass * partitions_per_pass;
+      int pass_end_index = pass_start_index + partitions_per_pass;
+      for (const auto &array : values->chunks()) {
+        std::shared_ptr<ARROW_ARRAY_T> casted_array = std::static_pointer_cast<ARROW_ARRAY_T>(array);
+        const int64_t arr_len = array->length();
+        for (int64_t i = 0; i < arr_len; i++, offset++) {
+          int i1 = target_partitions[offset];
+          if (i1 >= pass_start_index && i1 < pass_end_index) {
+            builders[i1]->UnsafeAppend(casted_array->Value(i));
+          }
+        }
       }
     }
 
