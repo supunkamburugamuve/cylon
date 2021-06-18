@@ -63,8 +63,8 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
 
     int partitions_per_pass = 10;
     int num_passes = ceil(((double)num_partitions) / partitions_per_pass);
-    size_t offset = 0;
     for (int pass = 0; pass < num_passes; pass++) {
+      size_t offset = 0;
       int pass_start_index = pass * partitions_per_pass;
       int pass_end_index = pass_start_index + partitions_per_pass;
       for (const auto &array : values->chunks()) {
