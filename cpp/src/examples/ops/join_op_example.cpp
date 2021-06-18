@@ -175,7 +175,7 @@ void create_int64_table(char *const *argv,
 
   std::random_device rd;
   std::mt19937_64 gen(rd());
-  std::uniform_int_distribution<int64_t> distrib(0, (int64_t) (count * dup));
+  std::uniform_int_distribution<int64_t> distrib(0, (int64_t) (count * dup * ctx->GetWorldSize()));
 
   std::mt19937_64 gen1(rd());
   std::uniform_real_distribution<double> distrib1;

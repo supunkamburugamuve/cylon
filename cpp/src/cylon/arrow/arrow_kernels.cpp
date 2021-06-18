@@ -52,32 +52,32 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
       RETURN_CYLON_STATUS_IF_ARROW_FAILED(builders.back()->Reserve(counts[i]));
     }
 
-//    size_t offset = 0;
-//    for (const auto &array : values->chunks()) {
-//      std::shared_ptr<ARROW_ARRAY_T> casted_array = std::static_pointer_cast<ARROW_ARRAY_T>(array);
-//      const int64_t arr_len = array->length();
-//      for (int64_t i = 0; i < arr_len; i++, offset++) {
-//        builders[target_partitions[offset]]->UnsafeAppend(casted_array->Value(i));
-//      }
-//    }
-
-    int partitions_per_pass = 10;
-    int num_passes = ceil(((double)num_partitions) / partitions_per_pass);
-    for (int pass = 0; pass < num_passes; pass++) {
-      size_t offset = 0;
-      int pass_start_index = pass * partitions_per_pass;
-      int pass_end_index = pass_start_index + partitions_per_pass;
-      for (const auto &array : values->chunks()) {
-        std::shared_ptr<ARROW_ARRAY_T> casted_array = std::static_pointer_cast<ARROW_ARRAY_T>(array);
-        const int64_t arr_len = array->length();
-        for (int64_t i = 0; i < arr_len; i++, offset++) {
-          int i1 = target_partitions[offset];
-          if (i1 >= pass_start_index && i1 < pass_end_index) {
-            builders[i1]->UnsafeAppend(casted_array->Value(i));
-          }
-        }
+    size_t offset = 0;
+    for (const auto &array : values->chunks()) {
+      std::shared_ptr<ARROW_ARRAY_T> casted_array = std::static_pointer_cast<ARROW_ARRAY_T>(array);
+      const int64_t arr_len = array->length();
+      for (int64_t i = 0; i < arr_len; i++, offset++) {
+        builders[target_partitions[offset]]->UnsafeAppend(casted_array->Value(i));
       }
     }
+
+//    int partitions_per_pass = 10;
+//    int num_passes = ceil(((double)num_partitions) / partitions_per_pass);
+//    for (int pass = 0; pass < num_passes; pass++) {
+//      size_t offset = 0;
+//      int pass_start_index = pass * partitions_per_pass;
+//      int pass_end_index = pass_start_index + partitions_per_pass;
+//      for (const auto &array : values->chunks()) {
+//        std::shared_ptr<ARROW_ARRAY_T> casted_array = std::static_pointer_cast<ARROW_ARRAY_T>(array);
+//        const int64_t arr_len = array->length();
+//        for (int64_t i = 0; i < arr_len; i++, offset++) {
+//          int i1 = target_partitions[offset];
+//          if (i1 >= pass_start_index && i1 < pass_end_index) {
+//            builders[i1]->UnsafeAppend(casted_array->Value(i));
+//          }
+//        }
+//      }
+//    }
 
     output.reserve(num_partitions);
     for (uint32_t i = 0; i < num_partitions; i++) {
@@ -492,7 +492,7 @@ class NumericStreamingSplitKernel : public StreamingSplitKernel {
 
  public:
   NumericStreamingSplitKernel(int32_t num_targets, arrow::MemoryPool *pool)
-      : StreamingSplitKernel(), builders_({}) {
+      : StreamingSplitKernel(), builders_({}), num_partitions(num_targets) {
     builders_.reserve(num_targets);
     for (int i = 0; i < num_targets; i++) {
       builders_.emplace_back(std::make_shared<BUILDER_T>(pool));
@@ -508,8 +508,23 @@ class NumericStreamingSplitKernel : public StreamingSplitKernel {
     }
 
     // append the values
-    for (size_t i = 0; i < partitions.size(); i++) {
-      builders_[partitions[i]]->UnsafeAppend(cast_array->Value(i));
+    unsigned long size = partitions.size();
+//    for (size_t i = 0; i < size; i++) {
+//      builders_[partitions[i]]->UnsafeAppend(cast_array->Value(i));
+//    }
+
+    int partitions_per_pass = 1;
+    int num_passes = ceil(((double)num_partitions) / partitions_per_pass);
+    for (int pass = 0; pass < num_passes; pass++) {
+      int pass_start_index = pass * partitions_per_pass;
+      int pass_end_index = pass_start_index + partitions_per_pass;
+      // append the values
+      for (size_t i = 0; i < size; i++) {
+        int i1 = partitions[i];
+        if (i1 >= pass_start_index && i1 < pass_end_index) {
+          builders_[i1]->UnsafeAppend(cast_array->Value(i));
+        }
+      }
     }
     return Status::OK();
   }
@@ -526,13 +541,14 @@ class NumericStreamingSplitKernel : public StreamingSplitKernel {
 
  private:
   std::vector<std::shared_ptr<BUILDER_T>> builders_;
+  int32_t num_partitions;
 };
 
 class FixedBinaryStreamingSplitKernel : public StreamingSplitKernel {
  public:
   FixedBinaryStreamingSplitKernel(const std::shared_ptr<arrow::DataType> &type_,
                                   int32_t num_targets, arrow::MemoryPool *pool)
-      : StreamingSplitKernel(), builders_({}) {
+      : StreamingSplitKernel(), builders_({}), num_partitions(num_targets) {
     builders_.reserve(num_targets);
     for (int i = 0; i < num_targets; i++) {
       builders_.emplace_back(std::make_shared<arrow::FixedSizeBinaryBuilder>(type_, pool));
@@ -566,6 +582,7 @@ class FixedBinaryStreamingSplitKernel : public StreamingSplitKernel {
 
  private:
   std::vector<std::shared_ptr<arrow::FixedSizeBinaryBuilder>> builders_;
+  int32_t num_partitions;
 };
 
 template <typename TYPE>
