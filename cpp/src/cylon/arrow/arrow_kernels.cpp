@@ -485,10 +485,13 @@ arrow::Status SortIndicesMultiColumns(arrow::MemoryPool *memory_pool,
 
 // STREAMING SPLIT-----------------------------------------------------------------------------
 
-template <typename TYPE>
+template <typename TYPE,
+    typename = typename std::enable_if<arrow::is_number_type<TYPE>::value | arrow::is_boolean_type<TYPE>::value
+                                       | arrow::is_temporal_type<TYPE>::value>::type>
 class NumericStreamingSplitKernel : public StreamingSplitKernel {
   using BUILDER_T = typename arrow::TypeTraits<TYPE>::BuilderType;
   using ARRAY_T = typename arrow::TypeTraits<TYPE>::ArrayType;
+  using T = typename TYPE::c_type;
 
  public:
   NumericStreamingSplitKernel(int32_t num_targets, arrow::MemoryPool *pool)
@@ -512,19 +515,26 @@ class NumericStreamingSplitKernel : public StreamingSplitKernel {
 //    for (size_t i = 0; i < size; i++) {
 //      builders_[partitions[i]]->UnsafeAppend(cast_array->Value(i));
 //    }
+    const std::shared_ptr<arrow::ArrayData> &data = values->data();
+    T *left_data = data->template GetMutableValues<T>(1);
+//    int partitions_per_pass = 1;
+//    int num_passes = ceil(((double)num_partitions) / partitions_per_pass);
+//    for (int pass = 0; pass < num_passes; pass++) {
+//      int pass_start_index = pass * partitions_per_pass;
+//      int pass_end_index = pass_start_index + partitions_per_pass;
+//      // append the values
+//      for (size_t i = 0; i < size; i++) {
+//        int i1 = partitions[i];
+//        if (i1 >= pass_start_index && i1 < pass_end_index) {
+////          builders_[i1]->UnsafeAppend(cast_array->Value(i));
+//          builders_[i1]->UnsafeAppend(left_data[i]);
+//        }
+//      }
+//    }
 
-    int partitions_per_pass = 1;
-    int num_passes = ceil(((double)num_partitions) / partitions_per_pass);
-    for (int pass = 0; pass < num_passes; pass++) {
-      int pass_start_index = pass * partitions_per_pass;
-      int pass_end_index = pass_start_index + partitions_per_pass;
-      // append the values
-      for (size_t i = 0; i < size; i++) {
-        int i1 = partitions[i];
-        if (i1 >= pass_start_index && i1 < pass_end_index) {
-          builders_[i1]->UnsafeAppend(cast_array->Value(i));
-        }
-      }
+    for (size_t i = 0; i < size; i++) {
+      int i1 = partitions[i];
+      builders_[i1]->UnsafeAppend(left_data[i]);
     }
     return Status::OK();
   }

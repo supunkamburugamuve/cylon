@@ -467,9 +467,13 @@ Status DistributedJoin(std::shared_ptr<cylon::Table> &left, std::shared_ptr<cylo
                                                               left_final_table, right_final_table));
 
   std::shared_ptr<arrow::Table> table;
+  auto t1 = std::chrono::high_resolution_clock::now();
   RETURN_CYLON_STATUS_IF_ARROW_FAILED(join::JoinTables(left_final_table, right_final_table, join_config, &table,
 													   cylon::ToArrowPool(ctx)));
   out = std::make_shared<cylon::Table>(ctx, table);
+  auto t2 = std::chrono::high_resolution_clock::now();
+  LOG(INFO) << "Join time : "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
 
   return Status::OK();
 }
