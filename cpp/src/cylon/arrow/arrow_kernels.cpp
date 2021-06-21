@@ -582,8 +582,6 @@ class NumericStreamingSplitKernel : public StreamingSplitKernel {
  private:
   std::vector<std::shared_ptr<BUILDER_T>> builders_;
   int32_t num_partitions;
-  std::vector<std::shared_ptr<arrow::Buffer>> build_buffers_;
-  std::vector<int> indexes_
 };
 
 class FixedBinaryStreamingSplitKernel : public StreamingSplitKernel {
