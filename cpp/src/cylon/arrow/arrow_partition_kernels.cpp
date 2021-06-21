@@ -100,12 +100,15 @@ class ModuloPartitionKernel : public HashPartitionKernel {
       return Status(Code::Invalid, "partial hashes size != idx col length!");
     }
 
-    LoopRunner<ARROW_ARRAY_T> loop_runner = [&](const std::shared_ptr<ARROW_ARRAY_T> &carr,
-                                                uint64_t offset,
-                                                uint64_t i) {
-      partial_hashes[offset] = 31 * partial_hashes[offset] + static_cast<uint32_t>(carr->Value(i));
-    };
-    run_loop(idx_col, loop_runner);
+    uint64_t offset = 0;
+    for (const auto &arr: idx_col->chunks()) {
+      const std::shared_ptr<ARROW_ARRAY_T> &carr = std::static_pointer_cast<ARROW_ARRAY_T>(arr);
+      const std::shared_ptr<arrow::ArrayData> &data = arr->data();
+      T *left_data = data->template GetMutableValues<T>(1);
+      for (int64_t i = 0; i < carr->length(); i++, offset++) {
+        partial_hashes[offset] = 31 * partial_hashes[offset] + static_cast<uint32_t>(left_data[i]);
+      }
+    }
 
     return Status::OK();
   }

@@ -32,8 +32,10 @@ arrow::Status do_copy_numeric_array(const std::vector<int64_t> &indices,
     LOG(FATAL) << "Failed to reserve memory when re arranging the array based on indices. " << status.ToString();
     return status;
   }
-
+  using T = typename TYPE::c_type;
   auto casted_array = std::static_pointer_cast<arrow::NumericArray<TYPE>>(data_array);
+  const std::shared_ptr<arrow::ArrayData> &data = data_array->data();
+  T *left_data = data->template GetMutableValues<T>(1);
   for (auto &index : indices) {
     // handle -1 index : comes in left, right joins
     if (index == -1) {
@@ -44,7 +46,7 @@ arrow::Status do_copy_numeric_array(const std::vector<int64_t> &indices,
     if (casted_array->length() <= index) {
       LOG(FATAL) << "INVALID INDEX " << index << " LENGTH " << casted_array->length();
     }
-    array_builder.UnsafeAppend(casted_array->Value(index));
+    array_builder.UnsafeAppend(left_data[index]);
   }
   return array_builder.Finish(copied_array);
 }

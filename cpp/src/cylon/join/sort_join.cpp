@@ -19,8 +19,11 @@ inline void advance(
   if (*current_index == sorted_indices->length()) {
     return;
   }
+  const std::shared_ptr<arrow::ArrayData> &data = sorted_indices->data();
+  int64_t *left_data = data->template GetMutableValues<int64_t>(1);
+
   auto data_column_casted = std::static_pointer_cast<ARROW_ARRAY_TYPE>(data_column);
-  int64_t data_index = sorted_indices->Value(*current_index);
+  int64_t data_index = left_data[*current_index];
   *key = data_column_casted->GetView(data_index);
   while (*current_index < sorted_indices->length() &&
       data_column_casted->GetView(data_index) == *key) {
@@ -29,7 +32,7 @@ inline void advance(
     if (*current_index == sorted_indices->length()) {
       break;
     }
-    data_index = sorted_indices->Value(*current_index);
+    data_index = left_data[*current_index];
   }
 }
 
