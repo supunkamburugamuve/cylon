@@ -37,6 +37,7 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
 
   using ARROW_ARRAY_T = typename arrow::TypeTraits<TYPE>::ArrayType;
   using ARROW_BUILDER_T = typename arrow::TypeTraits<TYPE>::BuilderType;
+  using T = typename TYPE::c_type;
 
   Status Split(const std::shared_ptr<arrow::ChunkedArray> &values, uint32_t num_partitions,
                const std::vector<uint32_t> &target_partitions, const std::vector<uint32_t> &counts,
@@ -45,19 +46,39 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
       return Status(Code::ExecutionError, "values rows != target_partitions length");
     }
 
-    std::vector<std::unique_ptr<ARROW_BUILDER_T>> builders;
-    builders.reserve(num_partitions);
+    LOG(INFO) << "FIRST LOOP";
+//    std::vector<std::unique_ptr<ARROW_BUILDER_T>> builders;
+//    builders.reserve(num_partitions);
+    std::vector<std::shared_ptr<arrow::Buffer>> build_buffers;
+    std::vector<int> indexes;
     for (uint32_t i = 0; i < num_partitions; i++) {
-      builders.push_back(std::make_unique<ARROW_BUILDER_T>(values->type(), pool_));
-      RETURN_CYLON_STATUS_IF_ARROW_FAILED(builders.back()->Reserve(counts[i]));
+//      builders.push_back(std::make_unique<ARROW_BUILDER_T>(values->type(), pool_));
+//      RETURN_CYLON_STATUS_IF_ARROW_FAILED(builders.back()->Reserve(counts[i]));
+      int64_t buf_size = counts[i] * sizeof(T);
+      LOG(INFO) << "ALLOC " << buf_size << " sizeof T" << sizeof (T);
+      arrow::Result<std::unique_ptr<arrow::Buffer>> result = arrow::AllocateBuffer(buf_size, pool_);
+      RETURN_CYLON_STATUS_IF_ARROW_FAILED(result.status());
+      std::shared_ptr<arrow::Buffer> indices_buf(std::move(result.ValueOrDie()));
+      build_buffers.push_back(indices_buf);
+      indexes.push_back(0);
     }
 
+    LOG(INFO) << "SECOND LOOP";
     size_t offset = 0;
     for (const auto &array : values->chunks()) {
-      std::shared_ptr<ARROW_ARRAY_T> casted_array = std::static_pointer_cast<ARROW_ARRAY_T>(array);
+      const std::shared_ptr<arrow::ArrayData> &data = array->data();
+      T *left_data = data->template GetMutableValues<T>(1);
+//      std::shared_ptr<ARROW_ARRAY_T> casted_array = std::static_pointer_cast<ARROW_ARRAY_T>(array);
+
       const int64_t arr_len = array->length();
       for (int64_t i = 0; i < arr_len; i++, offset++) {
-        builders[target_partitions[offset]]->UnsafeAppend(casted_array->Value(i));
+        unsigned int i1 = target_partitions[offset];
+        std::shared_ptr<arrow::Buffer> buf = build_buffers[i1];
+        auto *indices_begin = reinterpret_cast<T *>(buf->mutable_data());
+        int idx = indexes[i1];
+        indices_begin[idx] = left_data[i];
+        indexes[i1] = indexes[i1] + 1;
+//        builders[target_partitions[offset]]->UnsafeAppend(left_data[i]);
       }
     }
 
@@ -79,13 +100,22 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
 //      }
 //    }
 
+    LOG(INFO) << "THIRD LOOP";
     output.reserve(num_partitions);
     for (uint32_t i = 0; i < num_partitions; i++) {
-      std::shared_ptr<arrow::Array> array;
-      RETURN_CYLON_STATUS_IF_ARROW_FAILED(builders[i]->Finish(&array));
+//      std::shared_ptr<arrow::Array> array;
+      std::vector<std::shared_ptr<arrow::Buffer>> buffs;
+      if (arrow::internal::HasValidityBitmap(values->type()->id())) {
+        buffs.push_back(nullptr);
+        buffs[0] = nullptr;
+      }
+      buffs.push_back(build_buffers[i]);
+//      RETURN_CYLON_STATUS_IF_ARROW_FAILED(builders[i]->Finish(&array));
+      const std::shared_ptr<arrow::ArrayData> &data = arrow::ArrayData::Make(values->type(), counts[i], buffs);
+      std::shared_ptr<arrow::Array> array = arrow::MakeArray(data);
       output.push_back(array);
     }
-
+    LOG(INFO) << "DONE LOOP";
     return Status::OK();
   }
 };
@@ -552,6 +582,8 @@ class NumericStreamingSplitKernel : public StreamingSplitKernel {
  private:
   std::vector<std::shared_ptr<BUILDER_T>> builders_;
   int32_t num_partitions;
+  std::vector<std::shared_ptr<arrow::Buffer>> build_buffers_;
+  std::vector<int> indexes_
 };
 
 class FixedBinaryStreamingSplitKernel : public StreamingSplitKernel {
