@@ -55,7 +55,6 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
 //      builders.push_back(std::make_unique<ARROW_BUILDER_T>(values->type(), pool_));
 //      RETURN_CYLON_STATUS_IF_ARROW_FAILED(builders.back()->Reserve(counts[i]));
       int64_t buf_size = counts[i] * sizeof(T);
-      LOG(INFO) << "ALLOC " << buf_size << " sizeof T" << sizeof (T);
       arrow::Result<std::unique_ptr<arrow::Buffer>> result = arrow::AllocateBuffer(buf_size, pool_);
       RETURN_CYLON_STATUS_IF_ARROW_FAILED(result.status());
       std::shared_ptr<arrow::Buffer> indices_buf(std::move(result.ValueOrDie()));
