@@ -50,6 +50,7 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
 //    std::vector<std::unique_ptr<ARROW_BUILDER_T>> builders;
 //    builders.reserve(num_partitions);
     std::vector<std::shared_ptr<arrow::Buffer>> build_buffers;
+    std::vector<T *> data_buffs;
     std::vector<int> indexes;
     for (uint32_t i = 0; i < num_partitions; i++) {
 //      builders.push_back(std::make_unique<ARROW_BUILDER_T>(values->type(), pool_));
@@ -59,8 +60,11 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
       RETURN_CYLON_STATUS_IF_ARROW_FAILED(result.status());
       std::shared_ptr<arrow::Buffer> indices_buf(std::move(result.ValueOrDie()));
       build_buffers.push_back(indices_buf);
+      auto *indices_begin = reinterpret_cast<T *>(build_buffers.back()->mutable_data());
+      data_buffs.push_back(indices_begin);
       indexes.push_back(0);
     }
+
 
 //    LOG(INFO) << "SECOND LOOP";
     size_t offset = 0;
@@ -72,8 +76,8 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
       const int64_t arr_len = array->length();
       for (int64_t i = 0; i < arr_len; i++, offset++) {
         unsigned int i1 = target_partitions[offset];
-        std::shared_ptr<arrow::Buffer> buf = build_buffers[i1];
-        auto *indices_begin = reinterpret_cast<T *>(buf->mutable_data());
+//        std::shared_ptr<arrow::Buffer> buf = build_buffers[i1];
+        auto *indices_begin = data_buffs[i1];
         int idx = indexes[i1];
         indices_begin[idx] = left_data[i];
         indexes[i1] = indexes[i1] + 1;
@@ -524,63 +528,70 @@ class NumericStreamingSplitKernel : public StreamingSplitKernel {
 
  public:
   NumericStreamingSplitKernel(int32_t num_targets, arrow::MemoryPool *pool)
-      : StreamingSplitKernel(), builders_({}), num_partitions(num_targets) {
-    builders_.reserve(num_targets);
+      : StreamingSplitKernel(), num_partitions(num_targets), pool_(pool) {
     for (int i = 0; i < num_targets; i++) {
-      builders_.emplace_back(std::make_shared<BUILDER_T>(pool));
+      int64_t buf_size = 1024 * 1024 * sizeof(T);
+      arrow::Result<std::unique_ptr<arrow::ResizableBuffer>> result = arrow::AllocateResizableBuffer(buf_size, pool_);
+      std::shared_ptr<arrow::ResizableBuffer> indices_buf(std::move(result.ValueOrDie()));
+      build_buffers.push_back(indices_buf);
+
+      counts.push_back(0);
+      indexes.push_back(0);
     }
   }
 
   Status Split(const std::shared_ptr<arrow::Array> &values, const std::vector<uint32_t> &partitions,
                const std::vector<uint32_t> &cnts) override {
     const auto &cast_array = std::static_pointer_cast<ARRAY_T>(values);
+    type = values->type();
     // reserve additional space in the builders
-    for (size_t i = 0; i < builders_.size(); i++) {
-      RETURN_CYLON_STATUS_IF_ARROW_FAILED(builders_[i]->Reserve(cnts[i]));
+    data_buffs.clear();
+    for (int i = 0; i < num_partitions; i++) {
+      counts[i] += cnts[i];
+      build_buffers[i]->template TypedResize<T>(counts[i], false);
+
+      auto *indices_begin = reinterpret_cast<T *>(build_buffers[i]->mutable_data());
+      data_buffs.push_back(indices_begin);
     }
 
-    // append the values
-    unsigned long size = partitions.size();
-//    for (size_t i = 0; i < size; i++) {
-//      builders_[partitions[i]]->UnsafeAppend(cast_array->Value(i));
-//    }
     const std::shared_ptr<arrow::ArrayData> &data = values->data();
     T *left_data = data->template GetMutableValues<T>(1);
-//    int partitions_per_pass = 1;
-//    int num_passes = ceil(((double)num_partitions) / partitions_per_pass);
-//    for (int pass = 0; pass < num_passes; pass++) {
-//      int pass_start_index = pass * partitions_per_pass;
-//      int pass_end_index = pass_start_index + partitions_per_pass;
-//      // append the values
-//      for (size_t i = 0; i < size; i++) {
-//        int i1 = partitions[i];
-//        if (i1 >= pass_start_index && i1 < pass_end_index) {
-////          builders_[i1]->UnsafeAppend(cast_array->Value(i));
-//          builders_[i1]->UnsafeAppend(left_data[i]);
-//        }
-//      }
-//    }
-
-    for (size_t i = 0; i < size; i++) {
-      int i1 = partitions[i];
-      builders_[i1]->UnsafeAppend(left_data[i]);
+    const int64_t arr_len = values->length();
+    for (int64_t i = 0; i < arr_len; i++) {
+      unsigned int i1 = partitions[i];
+      auto *indices_begin = data_buffs[i1];
+      int idx = indexes[i1];
+      indices_begin[idx] = left_data[i];
+      indexes[i1] = indexes[i1] + 1;
     }
     return Status::OK();
   }
 
   Status Finish(std::vector<std::shared_ptr<arrow::Array>> &out) override {
-    out.reserve(builders_.size());
-    for (size_t i = 0; i < builders_.size(); i++) {
-      std::shared_ptr<arrow::Array> array;
-      RETURN_CYLON_STATUS_IF_ARROW_FAILED(builders_[i]->Finish(&array));
-      out.emplace_back(std::move(array));
+    out.reserve(num_partitions);
+    for (int i = 0; i < num_partitions; i++) {
+      std::vector<std::shared_ptr<arrow::Buffer>> buffs;
+      if (arrow::internal::HasValidityBitmap(type->id())) {
+        buffs.push_back(nullptr);
+        buffs[0] = nullptr;
+      }
+      buffs.push_back(build_buffers[i]);
+      const std::shared_ptr<arrow::ArrayData> &data = arrow::ArrayData::Make(type, counts[i], buffs);
+      std::shared_ptr<arrow::Array> array = arrow::MakeArray(data);
+      out.push_back(array);
     }
     return Status::OK();
   }
 
  private:
-  std::vector<std::shared_ptr<BUILDER_T>> builders_;
+//  std::vector<std::shared_ptr<BUILDER_T>> builders_;
   int32_t num_partitions;
+  std::shared_ptr<arrow::DataType> type;
+  std::vector<int> counts;
+  std::vector<std::shared_ptr<arrow::ResizableBuffer>> build_buffers;
+  std::vector<T *> data_buffs;
+  std::vector<int> indexes;
+  arrow::MemoryPool *pool_;
 };
 
 class FixedBinaryStreamingSplitKernel : public StreamingSplitKernel {
