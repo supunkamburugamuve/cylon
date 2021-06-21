@@ -46,7 +46,7 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
       return Status(Code::ExecutionError, "values rows != target_partitions length");
     }
 
-    LOG(INFO) << "FIRST LOOP";
+//    LOG(INFO) << "FIRST LOOP";
 //    std::vector<std::unique_ptr<ARROW_BUILDER_T>> builders;
 //    builders.reserve(num_partitions);
     std::vector<std::shared_ptr<arrow::Buffer>> build_buffers;
@@ -62,7 +62,7 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
       indexes.push_back(0);
     }
 
-    LOG(INFO) << "SECOND LOOP";
+//    LOG(INFO) << "SECOND LOOP";
     size_t offset = 0;
     for (const auto &array : values->chunks()) {
       const std::shared_ptr<arrow::ArrayData> &data = array->data();
@@ -99,7 +99,7 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
 //      }
 //    }
 
-    LOG(INFO) << "THIRD LOOP";
+//    LOG(INFO) << "THIRD LOOP";
     output.reserve(num_partitions);
     for (uint32_t i = 0; i < num_partitions; i++) {
 //      std::shared_ptr<arrow::Array> array;
@@ -114,7 +114,7 @@ class ArrowArrayNumericSplitKernel : public ArrowArraySplitKernel {
       std::shared_ptr<arrow::Array> array = arrow::MakeArray(data);
       output.push_back(array);
     }
-    LOG(INFO) << "DONE LOOP";
+//    LOG(INFO) << "DONE LOOP";
     return Status::OK();
   }
 };
