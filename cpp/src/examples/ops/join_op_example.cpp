@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
 //    cylon::WriteCSV(table, "/tmp/out_" + std::to_string(ctx->GetRank()) + ".csv");
   };
 
-  const auto &join_config = cylon::join::config::JoinConfig::InnerJoin(0, 0);
+  const auto &join_config = cylon::join::config::JoinConfig::InnerJoin(0, 0, cylon::join::config::JoinAlgorithm::HASH);
   const auto &part_config = cylon::PartitionOpConfig(ctx->GetWorldSize(), {0});
   const auto &dist_join_config = cylon::DisJoinOpConfig(part_config, join_config);
 
