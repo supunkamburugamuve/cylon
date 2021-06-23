@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
 //  second_table->retainMemory(false);
 
   const cylon::ResultsCallback &callback = [&](int tag, const std::shared_ptr<cylon::Table> &table) {
-    LOG(INFO) << tag << " Result received " << table->Rows();
+//    LOG(INFO) << tag << " Result received " << table->Rows();
 //    table->Print();
 //    cylon::WriteCSV(table, "/tmp/out_" + std::to_string(ctx->GetRank()) + ".csv");
   };
@@ -174,7 +174,7 @@ void create_int64_table(char *const *argv,
   std::cout << "#### lines " << count << " dup " << dup << std::endl;
 
   std::random_device rd;
-  std::mt19937_64 gen(rd());
+  std::mt19937_64 gen(0);
   std::uniform_int_distribution<int64_t> distrib(0, (int64_t) (count * dup * ctx->GetWorldSize()));
 
   std::mt19937_64 gen1(rd());
