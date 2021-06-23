@@ -213,7 +213,7 @@ int join_perf(int argc, char **argv) {
 //  first_table->retainMemory(false);
 //  second_table->retainMemory(false);
   status = cylon::DistributedJoin(first_table, second_table,
-                                  cylon::join::config::JoinConfig::InnerJoin(0, 0), joined);
+                                  cylon::join::config::JoinConfig::InnerJoin(0, 0, cylon::join::config::HASH), joined);
   if (!status.is_ok()) {
     LOG(INFO) << "Table join failed ";
     ctx->Finalize();
