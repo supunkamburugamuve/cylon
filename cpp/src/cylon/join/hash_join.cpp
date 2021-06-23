@@ -298,10 +298,10 @@ arrow::Status ArrayIndexHashJoin(const std::shared_ptr<arrow::Array> &left_idx_c
 
   auto t4 = std::chrono::high_resolution_clock::now();
 
-  LOG(INFO) << "idx hash join: setup: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()
-            << " build: " << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count()
-            << " probe: " << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count()
-            << " total: " << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t1).count();
+//  LOG(INFO) << "idx hash join: setup: " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()
+//            << " build: " << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count()
+//            << " probe: " << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count()
+//            << " total: " << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t1).count();
 
   return arrow::Status::OK();
 }
